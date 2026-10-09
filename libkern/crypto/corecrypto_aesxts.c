@@ -29,8 +29,7 @@
 #include <libkern/crypto/crypto_internal.h>
 #include <libkern/libkern.h>
 #include <libkern/crypto/aesxts.h>
-#include <corecrypto/ccmode.h>
-#include <corecrypto/ccpad.h>
+#include <libkern/crypto/ccmode_abi.h>
 #include <kern/debug.h>
 
 /*
@@ -41,15 +40,23 @@ uint32_t
 xts_start(uint32_t cipher __unused, // ignored - we're doing this for xts-aes only
     const uint8_t *IV __unused,               // ignored
     const uint8_t *key1, int keylen,
-    const uint8_t *key2, int tweaklen __unused,               // both keys are the same size for xts
+    const uint8_t *key2, int tweaklen,
     uint32_t num_rounds __unused,               // ignored
     uint32_t options __unused,                  // ignored
     symmetric_xts *xts)
 {
 	const struct ccmode_xts *enc, *dec;
 
+	if (!xts || !key1 || !key2 || keylen != tweaklen ||
+	    (keylen != 16 && keylen != 24 && keylen != 32)) {
+		if (xts) {
+			cc_clear(sizeof(*xts), xts);
+		}
+		return CCMODE_INVALID_INPUT;
+	}
+
 	if (!g_crypto_funcs) {
-		panic("%s: corecrypto not registered!", __FUNCTION__);
+		panic("%s: RustCrypto provider not registered!", __FUNCTION__);
 	}
 
 	enc = g_crypto_funcs->ccaes_xts_encrypt;
@@ -64,9 +71,13 @@ xts_start(uint32_t cipher __unused, // ignored - we're doing this for xts-aes on
 		panic("%s: inconsistent size for AES-XTS context", __FUNCTION__);
 	}
 
-	int rc = enc->init(enc, xts->enc, keylen, key1, key2);
-	rc |= dec->init(dec, xts->dec, keylen, key1, key2);
-
+	int rc = ccxts_init(enc, xts->enc, (size_t)keylen, key1, key2);
+	if (rc == 0) {
+		rc = ccxts_init(dec, xts->dec, (size_t)keylen, key1, key2);
+	}
+	if (rc != 0) {
+		cc_clear(sizeof(*xts), xts);
+	}
 	return rc;
 }
 
@@ -79,17 +90,17 @@ xts_encrypt(const uint8_t *pt, unsigned long ptlen,
 	const struct ccmode_xts *xtsenc = g_crypto_funcs->ccaes_xts_encrypt;
 	ccxts_tweak_decl(xtsenc->tweak_size, tweak);
 
-	if (ptlen % 16) {
-		panic("xts encrypt not a multiple of block size");
+	if (!xts || ptlen % 16 || ptlen / 16 > (1UL << 20)) {
+		return CCMODE_INVALID_INPUT;
 	}
 
-	int rc = xtsenc->set_tweak(xts->enc, tweak, iv);
-	if (rc) {
-		return rc;
+	int rc = ccxts_set_tweak(xtsenc, xts->enc, tweak, iv);
+	if (rc == 0 && ccxts_update(xtsenc, xts->enc, tweak,
+	    ptlen / 16, pt, ct) == NULL) {
+		rc = CCMODE_INVALID_INPUT;
 	}
-
-	xtsenc->xts(xts->enc, tweak, ptlen / 16, pt, ct);
-	return 0;
+	ccxts_tweak_clear(xtsenc->tweak_size, tweak);
+	return rc;
 }
 
 int
@@ -101,22 +112,25 @@ xts_decrypt(const uint8_t *ct, unsigned long ptlen,
 	const struct ccmode_xts *xtsdec = g_crypto_funcs->ccaes_xts_decrypt;
 	ccxts_tweak_decl(xtsdec->tweak_size, tweak);
 
-	if (ptlen % 16) {
-		panic("xts decrypt not a multiple of block size");
+	if (!xts || ptlen % 16 || ptlen / 16 > (1UL << 20)) {
+		return CCMODE_INVALID_INPUT;
 	}
 
-	int rc = xtsdec->set_tweak(xts->dec, tweak, iv);
-	if (rc) {
-		return rc;
+	int rc = ccxts_set_tweak(xtsdec, xts->dec, tweak, iv);
+	if (rc == 0 && ccxts_update(xtsdec, xts->dec, tweak,
+	    ptlen / 16, ct, pt) == NULL) {
+		rc = CCMODE_INVALID_INPUT;
 	}
-
-	xtsdec->xts(xts->dec, tweak, ptlen / 16, ct, pt);
-	return 0;
+	ccxts_tweak_clear(xtsdec->tweak_size, tweak);
+	return rc;
 }
 
 void
-xts_done(symmetric_xts *xts __unused)
+xts_done(symmetric_xts *xts)
 {
+	if (!xts) {
+		return;
+	}
 	cc_clear(sizeof(xts->enc), xts->enc);
 	cc_clear(sizeof(xts->dec), xts->dec);
 }

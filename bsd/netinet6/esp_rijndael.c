@@ -834,7 +834,7 @@ esp_gcm_encrypt_aes(
 		}
 
 		/*
-		 * The IV is now generated within corecrypto and
+		 * The IV is managed by the RustCrypto-backed GCM provider and
 		 * is provided to ESP using aes_encrypt_inc_iv_gcm().
 		 * This makes the sav->iv redundant and is no longer
 		 * used in GCM operations. But we still copy the IV
@@ -1083,7 +1083,7 @@ esp_aes_gcm_encrypt_data(struct secasvar *sav,
 {
 	unsigned char nonce[ESP_GCM_SALT_LEN + ESP_GCM_IVLEN] = {};
 	aes_gcm_ctx *ctx = NULL;
-	int rc = 0; // return code of corecrypto operations
+	int rc = 0; // RustCrypto-backed kernel API status
 
 	ESP_CHECK_ARG(sav);
 	ESP_CHECK_ARG(input_data);

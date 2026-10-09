@@ -102,16 +102,24 @@ pub unsafe fn build_afdt(
     panic_log_size: u32,
     ramdisk_phys: u64,
     ramdisk_size: u64,
+    // (paddr, length) of the trust cache window, or None when no blob is loaded.
+    trust_cache: Option<(u64, u64)>,
     cmdline: &str,
 ) -> u32 {
     let mut w = AfdtWriter::new(addr);
 
-    // Root node: 1 property ("name"), 5 children ("chosen", "defaults", "arm-io", "cpus", "pram")
-    w.node(1, 5);
+    // Root node: 3 properties ("name", "compatible", "model"), 5 children ("chosen", "defaults", "arm-io", "cpus", "pram")
+    //
+    // `compatible` is what hw.target reports (IODTPlatformExpert::getTargetName)
+    // and `model` is hw.product. A neutral QEMU identity: userspace that needs a
+    // real device target must be mapped case by case.
+    w.node(3, 5);
     w.string_prop("name", "device-tree");
+    w.string_prop("compatible", "QEMU,virt");
+    w.string_prop("model", "QEMU1,1");
 
-    // "chosen": 10 properties, 1 child ("memory-map")
-    w.node(10, 1);
+    // "chosen": 11 properties, 1 child ("memory-map")
+    w.node(11, 1);
     w.string_prop("name", "chosen");
     w.u64_prop("dram-base", ram_base);
     w.u64_prop("dram-size", dram_size);
@@ -121,6 +129,9 @@ pub unsafe fn build_afdt(
     w.bytes_prop("unique-chip-id", &[1, 2, 3, 4, 5, 6, 7, 8]);
     w.u32_prop("embedded-panic-log-size", panic_log_size);
     w.u32_prop("kernel-ctrr-to-be-enabled", 0);
+    // No persistent data volume: hw.ephemeral_storage. keybagd, among others,
+    // skips keybag initialization on an ephemeral-storage device.
+    w.u32_prop("ephemeral-storage", 1);
 
     // random-seed property (256 bytes)
     w.prop_name("random-seed");
@@ -132,10 +143,14 @@ pub unsafe fn build_afdt(
     }
     w.cur += 256;
 
-    // "chosen/memory-map": 2 properties ("name", "RAMDisk"), 0 children
-    w.node(2, 0);
+    // "chosen/memory-map": "name", "RAMDisk", and optionally "TrustCache" (DTTrustCacheRange)
+    let memory_map_props = if trust_cache.is_some() { 3 } else { 2 };
+    w.node(memory_map_props, 0);
     w.string_prop("name", "memory-map");
     w.pair_prop("RAMDisk", ramdisk_phys, ramdisk_size);
+    if let Some((tc_phys, tc_len)) = trust_cache {
+        w.pair_prop("TrustCache", tc_phys, tc_len);
+    }
 
     // "defaults": 2 properties, 0 children
     w.node(2, 0);

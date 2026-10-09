@@ -1,0 +1,284 @@
+diff --git a/clang/include/clang/Basic/Attr.td b/clang/include/clang/Basic/Attr.td
+index f8bd09773..f910c2442 100644
+--- a/clang/include/clang/Basic/Attr.td
++++ b/clang/include/clang/Basic/Attr.td
+@@ -3919,7 +3919,8 @@ def PointerAuth : TypeAttr {
+   let Spellings = [CustomKeyword<"__ptrauth">];
+   let Args = [IntArgument<"Key">,
+               BoolArgument<"AddressDiscriminated", 1>,
+-              IntArgument<"ExtraDiscriminator", 1>];
++              IntArgument<"ExtraDiscriminator", 1>,
++              ExprArgument<"Options", 1>];
+   let Documentation = [PtrAuthDocs];
+ }
+ 
+diff --git a/clang/include/clang/Basic/DiagnosticParseKinds.td b/clang/include/clang/Basic/DiagnosticParseKinds.td
+index 766568868..2baad1058 100644
+--- a/clang/include/clang/Basic/DiagnosticParseKinds.td
++++ b/clang/include/clang/Basic/DiagnosticParseKinds.td
+@@ -1622,7 +1622,7 @@ def warn_pragma_unroll_cuda_value_in_parens : Warning<
+   InGroup<CudaCompat>;
+ 
+ def err_ptrauth_qualifier_bad_arg_count : Error<
+-  "'__ptrauth' qualifier must take between 1 and 3 arguments">;
++  "'__ptrauth' qualifier must take between 1 and 4 arguments">;
+ 
+ def warn_cuda_attr_lambda_position : Warning<
+   "nvcc does not allow '__%0__' to appear after the parameter list in lambdas">,
+diff --git a/clang/include/clang/Basic/DiagnosticSemaKinds.td b/clang/include/clang/Basic/DiagnosticSemaKinds.td
+index 1054ab293..25133b451 100644
+--- a/clang/include/clang/Basic/DiagnosticSemaKinds.td
++++ b/clang/include/clang/Basic/DiagnosticSemaKinds.td
+@@ -1113,6 +1113,13 @@ def err_ptrauth_qualifier_invalid_target : Error<
+   "types; %0 is invalid">;
+ def err_ptrauth_qualifier_redundant: Error<
+   "type %0 is already '__ptrauth'-qualified">;
++def err_ptrauth_options_not_string : Error<
++  "the options argument to '__ptrauth' must be a string literal">;
++def err_ptrauth_option_invalid : Error<
++  "invalid '__ptrauth' option '%0'; expected 'isa-pointer', "
++  "'authenticates-null-values', 'strip', 'sign-and-strip' or 'sign-and-auth'">;
++def err_ptrauth_option_conflict : Error<
++  "'__ptrauth' option '%0' conflicts with an earlier option">;
+ def err_ptrauth_arg_not_ice : Error<
+   "argument to '__ptrauth' must be an integer constant expression">;
+ def err_ptrauth_address_discrimination_invalid : Error<
+diff --git a/clang/lib/CodeGen/CGPointerAuth.cpp b/clang/lib/CodeGen/CGPointerAuth.cpp
+index 438d08b53..56741084a 100644
+--- a/clang/lib/CodeGen/CGPointerAuth.cpp
++++ b/clang/lib/CodeGen/CGPointerAuth.cpp
+@@ -362,6 +362,19 @@ llvm::Value *CodeGenFunction::emitPointerAuthResign(
+   if (!CurAuthInfo && !NewAuthInfo)
+     return Value;
+ 
++  // With 'authenticates-null-values' a null pointer is signed and
++  // authenticated like any other value, rather than kept as null in storage.
++  // A pure sign or auth goes by the signed side; a resign only when both
++  // sides agree, as otherwise one side holds a raw null.
++  bool NullIsSigned;
++  if (!NewAuthInfo)
++    NullIsSigned = CurAuthInfo.authenticatesNullValues();
++  else if (!CurAuthInfo)
++    NullIsSigned = NewAuthInfo.authenticatesNullValues();
++  else
++    NullIsSigned = CurAuthInfo.authenticatesNullValues() &&
++                   NewAuthInfo.authenticatesNullValues();
++
+   llvm::Value *Null = nullptr;
+   // If the value is obviously null, we're done.
+   if (auto *PointerValue = dyn_cast<llvm::PointerType>(Value->getType())) {
+@@ -370,7 +383,7 @@ llvm::Value *CodeGenFunction::emitPointerAuthResign(
+     assert(Value->getType()->isIntegerTy());
+     Null = llvm::ConstantInt::get(IntPtrTy, 0);
+   }
+-  if (Value == Null)
++  if (Value == Null && !NullIsSigned)
+     return Value;
+ 
+   // If both schemas sign the same way, we're done.
+@@ -390,7 +403,8 @@ llvm::Value *CodeGenFunction::emitPointerAuthResign(
+ 
+   // Null pointers have to be mapped to null, and the ptrauth_resign
+   // intrinsic doesn't do that.
+-  if (!IsKnownNonNull && !llvm::isKnownNonZero(Value, CGM.getDataLayout())) {
++  if (!NullIsSigned && !IsKnownNonNull &&
++      !llvm::isKnownNonZero(Value, CGM.getDataLayout())) {
+     ContBB = createBasicBlock("resign.cont");
+     ResignBB = createBasicBlock("resign.nonnull");
+ 
+diff --git a/clang/lib/Parse/ParseDecl.cpp b/clang/lib/Parse/ParseDecl.cpp
+index 402492871..130bac1f3 100644
+--- a/clang/lib/Parse/ParseDecl.cpp
++++ b/clang/lib/Parse/ParseDecl.cpp
+@@ -3216,7 +3216,7 @@ void Parser::ParsePtrauthQualifier(ParsedAttributes &Attrs) {
+   T.consumeClose();
+   SourceLocation EndLoc = T.getCloseLocation();
+ 
+-  if (ArgExprs.empty() || ArgExprs.size() > 3) {
++  if (ArgExprs.empty() || ArgExprs.size() > 4) {
+     Diag(KwLoc, diag::err_ptrauth_qualifier_bad_arg_count);
+     return;
+   }
+diff --git a/clang/lib/Sema/SemaType.cpp b/clang/lib/Sema/SemaType.cpp
+index 1cb96b556..78081718f 100644
+--- a/clang/lib/Sema/SemaType.cpp
++++ b/clang/lib/Sema/SemaType.cpp
+@@ -8706,8 +8706,8 @@ static void HandleNeonVectorTypeAttr(QualType &CurType, const ParsedAttr &Attr,
+ static void HandlePtrAuthQualifier(ASTContext &Ctx, QualType &T,
+                                    const ParsedAttr &Attr, Sema &S) {
+ 
+-  assert((Attr.getNumArgs() > 0 && Attr.getNumArgs() <= 3) &&
+-         "__ptrauth qualifier takes between 1 and 3 arguments");
++  assert((Attr.getNumArgs() > 0 && Attr.getNumArgs() <= 4) &&
++         "__ptrauth qualifier takes between 1 and 4 arguments");
+   Expr *KeyArg = Attr.getArgAsExpr(0);
+   Expr *IsAddressDiscriminatedArg =
+       Attr.getNumArgs() >= 2 ? Attr.getArgAsExpr(1) : nullptr;
+@@ -8754,10 +8754,58 @@ static void HandlePtrAuthQualifier(ASTContext &Ctx, QualType &T,
+ 
+   assert((!IsAddressDiscriminatedArg || IsAddressDiscriminated <= 1) &&
+          "address discriminator arg should be either 0 or 1");
++  PointerAuthenticationMode AuthMode = PointerAuthenticationMode::SignAndAuth;
++  bool IsIsaPointer = false;
++  bool AuthenticatesNullValues = false;
++  if (Attr.getNumArgs() >= 4) {
++    // The optional options string: a comma-separated list of 'isa-pointer',
++    // 'authenticates-null-values' and at most one authentication mode.
++    const auto *Opts =
++        dyn_cast<StringLiteral>(Attr.getArgAsExpr(3)->IgnoreParenImpCasts());
++    if (!Opts || !Opts->isOrdinary()) {
++      S.Diag(Attr.getLoc(), diag::err_ptrauth_options_not_string);
++      Attr.setInvalid();
++      return;
++    }
++    SmallVector<StringRef, 4> Parts;
++    Opts->getString().split(Parts, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
++    bool HasMode = false;
++    for (StringRef Part : Parts) {
++      Part = Part.trim();
++      if (Part.empty())
++        continue;
++      std::optional<PointerAuthenticationMode> Mode;
++      if (Part == "isa-pointer") {
++        IsIsaPointer = true;
++        continue;
++      }
++      if (Part == "authenticates-null-values") {
++        AuthenticatesNullValues = true;
++        continue;
++      }
++      if (Part == "strip")
++        Mode = PointerAuthenticationMode::Strip;
++      else if (Part == "sign-and-strip")
++        Mode = PointerAuthenticationMode::SignAndStrip;
++      else if (Part == "sign-and-auth")
++        Mode = PointerAuthenticationMode::SignAndAuth;
++      else {
++        S.Diag(Attr.getLoc(), diag::err_ptrauth_option_invalid) << Part;
++        Attr.setInvalid();
++        return;
++      }
++      if (HasMode) {
++        S.Diag(Attr.getLoc(), diag::err_ptrauth_option_conflict) << Part;
++        Attr.setInvalid();
++        return;
++      }
++      HasMode = true;
++      AuthMode = *Mode;
++    }
++  }
+   PointerAuthQualifier Qual = PointerAuthQualifier::Create(
+-      Key, IsAddressDiscriminated, ExtraDiscriminator,
+-      PointerAuthenticationMode::SignAndAuth, /*IsIsaPointer=*/false,
+-      /*AuthenticatesNullValues=*/false);
++      Key, IsAddressDiscriminated, ExtraDiscriminator, AuthMode, IsIsaPointer,
++      AuthenticatesNullValues);
+   T = S.Context.getPointerAuthType(T, Qual);
+ }
+ 
+diff --git a/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp b/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp
+index 4bdd62a7b..9c41704ee 100644
+--- a/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp
++++ b/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp
+@@ -362,10 +362,10 @@ extractPtrauthBlendDiscriminators(SDValue Disc, SelectionDAG *DAG) {
+   if (!ConstDiscN || !isUInt<16>(ConstDiscN->getZExtValue()))
+     return std::make_tuple(DAG->getTargetConstant(0, DL, MVT::i64), Disc);
+ 
+-  // If there's no address discriminator, use NoRegister, which we'll later
+-  // replace with XZR, or directly use a Z variant of the inst. when available.
++  // If there's no address discriminator, use XZR to indicate that the
++  // instruction should use a Z (zero) variant of the register operand.
+   if (!AddrDisc)
+-    AddrDisc = DAG->getRegister(Register(), MVT::i64);
++    AddrDisc = DAG->getRegister(AArch64::XZR, MVT::i64);
+ 
+   return std::make_tuple(
+       DAG->getTargetConstant(ConstDiscN->getZExtValue(), DL, MVT::i64),
+@@ -11576,7 +11576,7 @@ AArch64TargetLowering::LowerDarwinGlobalTLSAddress(SDValue Op,
+     Opcode = AArch64ISD::AUTH_CALL;
+     Ops.push_back(DAG.getTargetConstant(AArch64PACKey::IA, DL, MVT::i32));
+     Ops.push_back(DAG.getTargetConstant(0, DL, MVT::i64)); // Integer Disc.
+-    Ops.push_back(DAG.getRegister(Register(), MVT::i64));  // Addr Disc.
++    Ops.push_back(DAG.getRegister(AArch64::XZR, MVT::i64));  // Addr Disc.
+   }
+ 
+   Ops.push_back(DAG.getRegister(AArch64::X0, MVT::i64));
+diff --git a/llvm/lib/Target/AArch64/AArch64InstrInfo.td b/llvm/lib/Target/AArch64/AArch64InstrInfo.td
+index f03ba0852..ba720cab9 100644
+--- a/llvm/lib/Target/AArch64/AArch64InstrInfo.td
++++ b/llvm/lib/Target/AArch64/AArch64InstrInfo.td
+@@ -2194,9 +2194,9 @@ let Predicates = [HasPAuth] in {
+   // materialization here), in part because they're handled in a safer way by
+   // the kernel, notably on Darwin.
+   def BLRA : Pseudo<(outs), (ins GPR64noip:$Rn, i32imm:$Key, i64imm:$Disc,
+-                                 GPR64:$AddrDisc),
++                                 GPR64all:$AddrDisc),
+                     [(AArch64authcall GPR64noip:$Rn, timm:$Key, timm:$Disc,
+-                                      GPR64:$AddrDisc)]>, Sched<[]> {
++                                      GPR64all:$AddrDisc)]>, Sched<[]> {
+     let isCodeGenOnly = 1;
+     let hasSideEffects = 1;
+     let mayStore = 0;
+@@ -2209,10 +2209,10 @@ let Predicates = [HasPAuth] in {
+ 
+   def BLRA_RVMARKER : Pseudo<
+         (outs), (ins i64imm:$rvfunc, i32imm:$withmarker, GPR64noip:$Rn,
+-                     i32imm:$Key, i64imm:$Disc, GPR64:$AddrDisc),
++                     i32imm:$Key, i64imm:$Disc, GPR64all:$AddrDisc),
+         [(AArch64authcall_rvmarker tglobaladdr:$rvfunc, timm:$withmarker,
+                                    GPR64noip:$Rn, timm:$Key, timm:$Disc,
+-                                   GPR64:$AddrDisc)]>, Sched<[]> {
++                                   GPR64all:$AddrDisc)]>, Sched<[]> {
+     let isCodeGenOnly = 1;
+     let isCall = 1;
+     let Defs = [X16,X17,LR];
+diff --git a/llvm/lib/Target/AArch64/AArch64Subtarget.cpp b/llvm/lib/Target/AArch64/AArch64Subtarget.cpp
+index 495029459..0b26bbb7e 100644
+--- a/llvm/lib/Target/AArch64/AArch64Subtarget.cpp
++++ b/llvm/lib/Target/AArch64/AArch64Subtarget.cpp
+@@ -53,7 +53,7 @@ unsigned AArch64Subtarget::getVectorInsertExtractBaseCost() const {
+ }
+ 
+ AArch64Subtarget &AArch64Subtarget::initializeSubtargetDependencies(
+-    StringRef FS, StringRef CPUString, StringRef TuneCPUString,
++    std::string FS, StringRef CPUString, StringRef TuneCPUString,
+     bool HasMinSize) {
+   // Determine default and user-specified characteristics
+ 
+@@ -63,6 +63,13 @@ AArch64Subtarget &AArch64Subtarget::initializeSubtargetDependencies(
+   if (TuneCPUString.empty())
+     TuneCPUString = CPUString;
+ 
++  // arm64e requires pointer authentication; the ptrauth instructions used for
++  // its ABI are always available on the hardware and must not depend on
++  // speculative -mcpu/-march feature defaults (e.g. -mcpu=generic does not
++  // imply FEAT_PAuth).
++  if (TargetTriple.isArm64e() && !StringRef(FS).contains("+pauth"))
++    FS += FS.empty() ? "+pauth" : ",+pauth";
++
+   ParseSubtargetFeatures(CPUString, TuneCPUString, FS);
+   initializeProperties(HasMinSize);
+ 
+@@ -322,7 +329,8 @@ AArch64Subtarget::AArch64Subtarget(const Triple &TT, StringRef CPU,
+       EnableSubregLiveness(IsStreaming ||
+                            CLOpts.enable_subreg_liveness_tracking),
+       TargetTriple(TT),
+-      InstrInfo(initializeSubtargetDependencies(FS, CPU, TuneCPU, HasMinSize)),
++      InstrInfo(initializeSubtargetDependencies(FS.str(), CPU, TuneCPU,
++                                                HasMinSize)),
+       TLInfo(TM, *this) {
+   if (AArch64::isX18ReservedByDefault(TT))
+     ReserveXRegister.set(18);
+diff --git a/llvm/lib/Target/AArch64/AArch64Subtarget.h b/llvm/lib/Target/AArch64/AArch64Subtarget.h
+index e75f7b0b6..10cc75545 100644
+--- a/llvm/lib/Target/AArch64/AArch64Subtarget.h
++++ b/llvm/lib/Target/AArch64/AArch64Subtarget.h
+@@ -134,7 +134,7 @@ private:
+   /// initializeSubtargetDependencies - Initializes using CPUString and the
+   /// passed in feature string so that we can use initializer lists for
+   /// subtarget initialization.
+-  AArch64Subtarget &initializeSubtargetDependencies(StringRef FS,
++  AArch64Subtarget &initializeSubtargetDependencies(std::string FS,
+                                                     StringRef CPUString,
+                                                     StringRef TuneCPUString,
+                                                     bool HasMinSize);

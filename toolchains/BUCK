@@ -1,0 +1,194 @@
+load("@prelude//toolchains:cxx.bzl", "cxx_tools_info_toolchain")
+load("@prelude//toolchains:rust.bzl", "system_rust_toolchain")
+load("@prelude//toolchains:genrule.bzl", "system_genrule_toolchain")
+load("@prelude//toolchains:python.bzl", "system_python_bootstrap_toolchain")
+load(":defs.bzl", "custom_cxx_tools", "sysroot_rust_toolchain")
+
+# Board selection must come from the root cell's [xnu] section; a plain
+# read_config here reads the toolchains cell's config and always sees the default.
+_BOARD = read_root_config("xnu", "board", "qemu")
+
+# A toolchain prefix (xnu.toolchain_root, from the root cell's config) with the
+# usual layout: <root>/bin/{clang,clang++,ld64.mold}, <root>/lib/libLTO.so.
+# mold and clang find libLTO beside the bin/ they live in, so nothing here names
+# it. Unset means the system clang and ld64.mold on PATH, as a self-hosted
+# build uses.
+_ROOT = read_root_config("xnu", "toolchain_root", "")
+_CLANG = _ROOT + "/bin/clang" if _ROOT else ""
+_LD = _ROOT + "/bin/ld64.mold" if _ROOT else "ld64.mold"
+
+# Optimization level for every compile in the tree, shared with //xnu:kernel.bzl
+# (opt_level()): C and C++ get -O<level>, Rust gets -C opt-level=<level>.
+_OPT = read_root_config("xnu", "opt_level", "3")
+_OPT_FLAG = "-O" + _OPT if _OPT in ["0", "1", "2", "3", "s", "z"] else fail("xnu.opt_level must be 0, 1, 2, 3, s or z, got " + _OPT)
+
+# The system clang can't parse the 4-arg "authenticates-null-values" __ptrauth
+# schema; the tree clang (patched, see subprojects/llvm-project) can.
+_NO_AUTH_NULL_SCHEMA = [] if _ROOT else ["-DXNU_PTRAUTH_NO_AUTH_NULL_SCHEMA"]
+_RUST_EXTRA = {"sysroot": select({
+    "prelude//os/constraints:macos": ":rust_sysroot",
+    "DEFAULT": None,
+})}
+# The darwin targets' std isn't taken from the installed rustc: arm64e has
+# none, and the installed aarch64-apple-darwin one goes stale whenever rustc is
+# rebuilt (rustc then rejects it). core/alloc/compiler_builtins are built with
+# -Zbuild-std for the board's triple into a sysroot (rust_sysroot below).
+_ARM64E = _BOARD == "qemu-arm64e"
+_RUST_DARWIN_TRIPLE = "arm64e-apple-darwin" if _ARM64E else "aarch64-apple-darwin"
+_APPLE_TRIPLE = "arm64e-apple-macos27.0.0" if _ARM64E else "arm64-apple-macos27.0.0"
+_rust_toolchain = sysroot_rust_toolchain
+
+# The rlibs of the sysroot below only load into the rustc that built them, but
+# genrule keys don't see the compiler. This one reruns on every build (it is
+# cheap) and the sysroot is keyed on its output, so a new rustc rebuilds it.
+genrule(
+    name = "rustc_version",
+    out = "rustc_version.txt",
+    cmd = "rustc -vV > $OUT",
+    cacheable = False,
+)
+
+genrule(
+    name = "rust_sysroot",
+    srcs = ["rust_sysroot/Cargo.toml", "rust_sysroot/src/lib.rs", ":rustc_version"],
+    out = "sysroot",
+    cmd = """
+set -e
+export RUSTC_BOOTSTRAP=1
+W=$TMP/w; mkdir -p $W/src
+cp $SRCDIR/rust_sysroot/Cargo.toml $W/
+cp $SRCDIR/rust_sysroot/src/lib.rs $W/src/
+(cd $W && CARGO_TARGET_DIR=$TMP/t cargo build --release --target @TRIPLE@ \\
+    -Zbuild-std=core,alloc,compiler_builtins -Zbuild-std-features=compiler-builtins-mem)
+D=$OUT/lib/rustlib/@TRIPLE@/lib
+mkdir -p $D
+cp $TMP/t/@TRIPLE@/release/build/{core,alloc,compiler_builtins}/*/out/lib*.{rlib,rmeta} $D/
+""".replace("@TRIPLE@", _RUST_DARWIN_TRIPLE),
+    visibility = ["PUBLIC"],
+)
+system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"])
+system_python_bootstrap_toolchain(name = "python_bootstrap", visibility = ["PUBLIC"])
+
+_rust_toolchain(
+    name = "rust",
+    default_edition = "2021",
+    rustc_target_triple = select({
+        "prelude//os/constraints:none": "aarch64-unknown-none",
+        "prelude//os/constraints:macos": _RUST_DARWIN_TRIPLE,
+        "DEFAULT": "x86_64-unknown-linux-gnu",
+    }),
+    # The prelude passes no optimization level; without this every crate
+    # (kernel and host tools alike) builds at opt-level 0.
+    rustc_flags = ["-C", "opt-level=" + _OPT] + select({
+        "prelude//os/constraints:none": [
+            "-C",
+            "panic=abort",
+        ],
+        "prelude//os/constraints:macos": [
+            "-C",
+            "panic=abort",
+            # The kernel runs on whatever CPU the board has (a Cortex-A53 has no
+            # LSE, which the darwin target's default CPU would emit atomics for).
+            "-C",
+            "target-cpu=generic",
+            "--cfg",
+            'sha2_backend="soft"',
+            "--cfg",
+            'sha1_backend="soft"',
+            "--cfg",
+            'md5_backend="soft"', 
+            "--cfg",
+            'aes_backend="soft"',
+            "--cfg",
+            'chacha20_backend="soft"',
+            "--cfg",
+            'poly1305_backend="soft"',
+            "--cfg",
+            'polyval_backend="soft"',
+        ] + ([
+            # Rust does not sign or authenticate function pointers on arm64e;
+            # xnurc converts at the C boundary under this cfg.
+            "--cfg",
+            "xnu_arm64e",
+        ] if _ARM64E else []) + [
+            "-C",
+            "linker=clang",
+            "-C",
+            "link-arg=--ld-path=" + _LD,
+            "-C",
+            "link-arg=-target",
+            "-C",
+            "link-arg=" + _APPLE_TRIPLE,
+        ],
+        "DEFAULT": [
+            "-C",
+            "linker=clang",
+            "-C",
+            "link-arg=-fuse-ld=mold",
+        ],
+    }),
+    visibility = ["PUBLIC"],
+    **_RUST_EXTRA
+)
+
+custom_cxx_tools(
+    name = "host_tools",
+    linker = "clang++",
+    linker_type = "gnu",
+    visibility = ["PUBLIC"],
+)
+
+custom_cxx_tools(
+    name = "none_tools",
+    linker = "toolchains/lld_wrapper.sh",
+    linker_type = "gnu",
+    visibility = ["PUBLIC"],
+)
+
+custom_cxx_tools(
+    name = "darwin_tools",
+    linker = "clang++",
+    linker_type = "darwin",
+    clang = _CLANG,
+    visibility = ["PUBLIC"],
+)
+
+cxx_tools_info_toolchain(
+    name = "cxx",
+    cxx_tools_info = select({
+        "prelude//os/constraints:none": ":none_tools",
+        "prelude//os/constraints:macos": ":darwin_tools",
+        "DEFAULT": ":host_tools",
+    }),
+    link_style = "static",
+    c_flags = select({
+        "prelude//os/constraints:macos": [
+            "-target",
+            _APPLE_TRIPLE,
+            "-ffreestanding",
+            "-nostdlibinc",
+        ] + _NO_AUTH_NULL_SCHEMA + [_OPT_FLAG],
+        "DEFAULT": [_OPT_FLAG],
+    }),
+    cxx_flags = select({
+        "prelude//os/constraints:macos": [
+            "-target",
+            _APPLE_TRIPLE,
+            "-ffreestanding",
+            "-nostdlibinc",
+        ] + _NO_AUTH_NULL_SCHEMA + [_OPT_FLAG],
+        "DEFAULT": [_OPT_FLAG],
+    }),
+    link_flags = select({
+        "prelude//os/constraints:none": [],
+        "prelude//os/constraints:macos": [
+            "-target",
+            _APPLE_TRIPLE,
+            "--ld-path=" + _LD,
+        ],
+        "DEFAULT": [
+            "-fuse-ld=mold",
+        ],
+    }),
+    visibility = ["PUBLIC"],
+)

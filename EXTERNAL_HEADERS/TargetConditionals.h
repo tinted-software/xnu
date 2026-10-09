@@ -454,6 +454,18 @@
     #define TARGET_OS_DRIVERKIT 0
 #endif 
 
+#ifndef TARGET_OS_BRIDGE
+    #define TARGET_OS_BRIDGE    0
+#endif
+
+#ifndef TARGET_OS_EXCLAVECORE
+    #define TARGET_OS_EXCLAVECORE 0
+#endif
+
+#ifndef TARGET_OS_EXCLAVEKIT
+    #define TARGET_OS_EXCLAVEKIT 0
+#endif
+
 #ifndef TARGET_OS_WIN32
     #define TARGET_OS_WIN32     0
 #endif

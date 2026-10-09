@@ -1094,9 +1094,9 @@ gss_crypto_ctx_init(struct crypto_ctx *ctx, lucid_context_t lucid)
 	switch (ctx->etype) {
 	case AES128_CTS_HMAC_SHA1_96:
 	case AES256_CTS_HMAC_SHA1_96:
-		ctx->enc_mode = ccaes_cbc_encrypt_mode();
+		ctx->enc_mode = xnu_rc_aes_cbc_encrypt_mode();
 		assert(ctx->enc_mode);
-		ctx->dec_mode = ccaes_cbc_decrypt_mode();
+		ctx->dec_mode = xnu_rc_aes_cbc_decrypt_mode();
 		assert(ctx->dec_mode);
 		ctx->ks.enc = NULL;
 		ctx->ks.dec = NULL;
@@ -1115,9 +1115,9 @@ gss_crypto_ctx_init(struct crypto_ctx *ctx, lucid_context_t lucid)
 		krb5_key_derivation(ctx, usage_string, KRB5_USAGE_LEN, &ctx->ckeys[GSS_RCV], ctx->keylen);
 		break;
 	case DES3_CBC_SHA1_KD:
-		ctx->enc_mode = ccdes3_cbc_encrypt_mode();
+		ctx->enc_mode = xnu_rc_tdes_cbc_encrypt_mode();
 		assert(ctx->enc_mode);
-		ctx->dec_mode = ccdes3_cbc_decrypt_mode();
+		ctx->dec_mode = xnu_rc_tdes_cbc_decrypt_mode();
 		assert(ctx->dec_mode);
 		gss_krb5_key_set(&ctx->ks.ikeys[GSS_SND], ctx->key, ctx->keylen);
 		gss_krb5_key_set(&ctx->ks.ikeys[GSS_RCV], ctx->key, ctx->keylen);
@@ -2645,9 +2645,6 @@ gss_krb5_make_context(void *data, uint32_t datalen)
 {
 	gss_ctx_id_t ctx;
 
-	if (!corecrypto_available()) {
-		return NULL;
-	}
 
 	gss_krb5_mech_init();
 	ctx = kalloc_type(struct gss_ctx_id_desc, Z_WAITOK | Z_ZERO);

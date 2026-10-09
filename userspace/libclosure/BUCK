@@ -1,0 +1,60 @@
+load("//userspace/libc:sources.bzl", "LIBC_INCLUDE_FLAGS")
+load("//xnu:kernel.bzl", "target_triple")
+
+# Blocks runtime (libclosure), the system-dylib source set from
+# Blocks.xcodeproj ("Blocks-dynamic"): runtime.cpp, data.c, generic_helpers.c.
+#
+# Deviations from Blocks.xcconfig (forced because the umbrella does not provide
+# the libraries they would reference):
+#   HAVE_OBJC=0   libobjc is not in the umbrella; data.c still emits the
+#                 NSConcrete* class data, as in the !HAVE_OBJC configuration.
+#   HAVE_UNWIND=0 libunwind/libcompiler_rt are not in the tree; the runtime uses
+#                 the non-exception copy/dispose helper path upstream uses for
+#                 driverkit. Exceptions thrown from copy helpers are not
+#                 cleaned up in this configuration.
+
+cxx_library(
+    name = "libclosure_objects",
+    srcs = ["runtime.cpp", "data.c", "generic_helpers.c"],
+    headers = {
+        "Block.h": "Block.h",
+        "Block_private.h": "Block_private.h",
+    },
+    header_namespace = "",
+    deps = [
+        "//:userspace_generated",
+        "//userspace:system_headers",
+        "//userspace/libc:libc_features",
+        "//userspace/AvailabilityVersions:headers",
+        "//userspace/libplatform:headers",
+        "//userspace/dyld:libcxx_headers",
+    ],
+    compiler_flags = [
+        "-target", target_triple(),
+        "-nostdlibinc", "-Os", "-fvisibility=hidden", "-fno-common",
+        "-DHAVE_OBJC=0", "-DHAVE_UNWIND=0",
+        "-DPRIVATE", "-D__APPLE_API_PRIVATE",
+        "-D__DARWIN_UNIX03=1", "-D__DARWIN_64_BIT_INO_T=1", "-D__DARWIN_NON_CANCELABLE=1",
+        "-D__DARWIN_ONLY_VERS_1050=1", "-D__DARWIN_ONLY_UNIX_CONFORMANCE=1", "-D__DARWIN_ONLY_64_BIT_INO_T=1",
+        "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+        "-I$(location //userspace/AvailabilityVersions:headers)",
+        "-I$(location //userspace:system_headers)",
+        "-I$(location //:userspace_generated)/include",
+        "-I$(location //userspace/libc:libc_features)/arm64",
+        "-Iuserspace/libclosure",
+        "-Iuserspace/libc/include", "-Iuserspace/libc/darwin",
+        "-IEXTERNAL_HEADERS",
+        "-I$(location //:system_framework_headers)",
+    ] + LIBC_INCLUDE_FLAGS + [
+        "-Wall", "-Wno-unused-function",
+    ],
+    lang_compiler_flags = {
+        "c": ["-std=gnu11", "-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+        "cxx": ["-std=c++20", "-fno-exceptions", "-fno-rtti", "-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

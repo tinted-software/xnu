@@ -1,7 +1,7 @@
 #include <libkern/crypto/crypto_internal.h>
 #include <libkern/crypto/sha1.h>
 #include <kern/debug.h>
-#include <corecrypto/ccdigest.h>
+#include <libkern/crypto/ccdigest_abi.h>
 
 
 static uint64_t
@@ -22,7 +22,7 @@ DiToSHA1(const struct ccdigest_info *di, struct ccdigest_ctx *di_ctx, SHA1_CTX *
 {
 	setCount(sha1_ctx, ccdigest_nbits(di, di_ctx) / 8 + ccdigest_num(di, di_ctx));
 	memcpy(sha1_ctx->m.b8, ccdigest_data(di, di_ctx), di->block_size);
-	memcpy(sha1_ctx->h.b8, ccdigest_state_ccn(di, di_ctx), di->state_size);
+	memcpy(sha1_ctx->h.b8, ccdigest_state(di, di_ctx), di->state_size);
 }
 
 /* Copy a legacy SHA1 context into a ccdigest ctx  */
@@ -34,7 +34,7 @@ SHA1ToDi(const struct ccdigest_info *di, SHA1_CTX *sha1_ctx, struct ccdigest_ctx
 	ccdigest_num(di, di_ctx) = (unsigned)(count % di->block_size);
 	ccdigest_nbits(di, di_ctx) = (count - ccdigest_num(di, di_ctx)) * 8;
 	memcpy(ccdigest_data(di, di_ctx), sha1_ctx->m.b8, di->block_size);
-	memcpy(ccdigest_state_ccn(di, di_ctx), sha1_ctx->h.b8, di->state_size);
+	memcpy(ccdigest_state(di, di_ctx), sha1_ctx->h.b8, di->state_size);
 }
 
 void

@@ -1,0 +1,10 @@
+# Host replacement for Apple's dtrace (-h header generation only; see main.rs).
+rust_binary(
+    name = "dtrace",
+    srcs = ["main.rs"],
+    crate = "dtrace",
+    crate_root = "main.rs",
+    edition = "2021",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)

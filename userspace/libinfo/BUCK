@@ -1,0 +1,187 @@
+# Apple Libinfo (libsystem_info): Libinfo.xcodeproj's libsystem_info Sources
+# phase (107 files; nis.subproj/getnetgrent.c is not in the target) with
+# Libinfo.xcconfig's macosx definitions (CONFIG_MAC DARWIN_DIRECTORY_AVAILABLE
+# DS_AVAILABLE SYNTH_ROOTFS). NOT YET BUILDABLE: the headers below are neither
+# in this tree nor in apple-oss-distributions, or need host tools not present:
+#   xpc/xpc.h, xpc/private.h (libxpc; unguarded in gen.subproj/configuration_profile.c)
+#   opendirectory/odipc.h, opendirectory/DSlibinfoMIG_types.h (DSlibinfoMIG.defs unpublished)
+#   DarwinDirectory/RecordStore_priv.h (unpublished)
+#   rpcsvc/yp.h, rpcsvc/yppasswd.h (rpcgen of Librpcsvc/yp.x; no rpcgen on host)
+# Published upstream but not yet vendored: dns_sd.h, dns_sd_private.h (mDNSResponder),
+# nameser.h (Libresolv), os/feature_private.h (//userspace/featureflags:headers),
+# dispatch/private.h (libdispatch private/).
+
+load("//userspace/libc:sources.bzl", "LIBC_BASE_FLAGS", "LIBC_INCLUDE_FLAGS")
+
+# Xcode installs rpc.subproj headers as <rpc/*.h> and nis.subproj's
+# yp_prot.h/ypclnt.h as <rpcsvc/*.h> (xcodescripts/install_files.sh). Lay out
+# the same include root so the sources' <rpc/...> and <rpcsvc/...> resolve.
+genrule(
+    name = "libinfo_rpc_include",
+    srcs = glob(["rpc.subproj/*.h"]) + ["nis.subproj/yp_prot.h", "nis.subproj/ypclnt.h"],
+    out = "include",
+    cmd = "set -e\n" +
+          "mkdir -p $OUT/rpc $OUT/rpcsvc\n" +
+          "cp rpc.subproj/*.h $OUT/rpc/\n" +
+          "cp nis.subproj/yp_prot.h nis.subproj/ypclnt.h $OUT/rpcsvc/\n",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "libinfo_objects",
+    srcs = [
+        "Libinfo/od_debug.c",
+        "dns.subproj/herror.c",
+        "dns.subproj/res_comp.c",
+        "dns.subproj/res_query.c",
+        "gen.subproj/configuration_profile.c",
+        "gen.subproj/ether_addr.c",
+        "gen.subproj/getifaddrs.c",
+        "gen.subproj/getifmaddrs.c",
+        "gen.subproj/if_indextoname.c",
+        "gen.subproj/if_nameindex.c",
+        "gen.subproj/if_nametoindex.c",
+        "gen.subproj/ip6opt.c",
+        "gen.subproj/map_v4v6.c",
+        "gen.subproj/rthdr.c",
+        "gen.subproj/vars.c",
+        "lookup.subproj/cache_module.c",
+        "lookup.subproj/darwin_directory.c",
+        "lookup.subproj/ds_module.c",
+        "lookup.subproj/file_module.c",
+        "lookup.subproj/getnameinfo_link.c",
+        "lookup.subproj/ils.c",
+        "lookup.subproj/kvbuf.c",
+        "lookup.subproj/libinfo.c",
+        "lookup.subproj/mdns_module.c",
+        "lookup.subproj/muser_module.c",
+        "lookup.subproj/search_module.c",
+        "lookup.subproj/si_compare.c",
+        "lookup.subproj/si_data.c",
+        "lookup.subproj/si_getaddrinfo.c",
+        "lookup.subproj/si_module.c",
+        "lookup.subproj/thread_data.c",
+        "membership.subproj/membership.c",
+        "nis.subproj/getdomainname.c",
+        "nis.subproj/innetgr.c",
+        "nis.subproj/setdomainname.c",
+        "nis.subproj/xdr_domainname.c",
+        "nis.subproj/xdr_keydat.c",
+        "nis.subproj/xdr_mapname.c",
+        "nis.subproj/xdr_peername.c",
+        "nis.subproj/xdr_valdat.c",
+        "nis.subproj/xdr_ypbind_binding.c",
+        "nis.subproj/xdr_ypbind_resp.c",
+        "nis.subproj/xdr_ypbind_resptype.c",
+        "nis.subproj/xdr_ypbind_setdom.c",
+        "nis.subproj/xdr_ypmaplist.c",
+        "nis.subproj/xdr_ypreq_key.c",
+        "nis.subproj/xdr_ypreq_nokey.c",
+        "nis.subproj/xdr_ypresp_all.c",
+        "nis.subproj/xdr_ypresp_key_val.c",
+        "nis.subproj/xdr_ypresp_maplist.c",
+        "nis.subproj/xdr_ypresp_master.c",
+        "nis.subproj/xdr_ypresp_order.c",
+        "nis.subproj/xdr_ypresp_val.c",
+        "nis.subproj/xdr_ypstat.c",
+        "nis.subproj/yp_all.c",
+        "nis.subproj/yp_bind.c",
+        "nis.subproj/yp_first.c",
+        "nis.subproj/yp_get_default_domain.c",
+        "nis.subproj/yp_maplist.c",
+        "nis.subproj/yp_master.c",
+        "nis.subproj/yp_order.c",
+        "nis.subproj/yperr_string.c",
+        "nis.subproj/ypmatch_cache.c",
+        "nis.subproj/yppasswdd_xdr.c",
+        "nis.subproj/ypprot_err.c",
+        "rpc.subproj/auth_none.c",
+        "rpc.subproj/auth_unix.c",
+        "rpc.subproj/authunix_prot.c",
+        "rpc.subproj/bindresvport.c",
+        "rpc.subproj/clnt_generic.c",
+        "rpc.subproj/clnt_perror.c",
+        "rpc.subproj/clnt_raw.c",
+        "rpc.subproj/clnt_simple.c",
+        "rpc.subproj/clnt_tcp.c",
+        "rpc.subproj/clnt_udp.c",
+        "rpc.subproj/get_myaddress.c",
+        "rpc.subproj/getrpcent.c",
+        "rpc.subproj/getrpcport.c",
+        "rpc.subproj/pmap_clnt.c",
+        "rpc.subproj/pmap_getmaps.c",
+        "rpc.subproj/pmap_getport.c",
+        "rpc.subproj/pmap_prot.c",
+        "rpc.subproj/pmap_prot2.c",
+        "rpc.subproj/pmap_rmt.c",
+        "rpc.subproj/pmap_wakeup.c",
+        "rpc.subproj/rpc_callmsg.c",
+        "rpc.subproj/rpc_commondata.c",
+        "rpc.subproj/rpc_dtablesize.c",
+        "rpc.subproj/rpc_prot.c",
+        "rpc.subproj/svc.c",
+        "rpc.subproj/svc_auth.c",
+        "rpc.subproj/svc_auth_unix.c",
+        "rpc.subproj/svc_raw.c",
+        "rpc.subproj/svc_run.c",
+        "rpc.subproj/svc_simple.c",
+        "rpc.subproj/svc_tcp.c",
+        "rpc.subproj/svc_udp.c",
+        "rpc.subproj/xdr.c",
+        "rpc.subproj/xdr_array.c",
+        "rpc.subproj/xdr_float.c",
+        "rpc.subproj/xdr_mem.c",
+        "rpc.subproj/xdr_rec.c",
+        "rpc.subproj/xdr_reference.c",
+        "rpc.subproj/xdr_sizeof.c",
+        "rpc.subproj/xdr_stdio.c",
+        "util.subproj/hton.c",
+        "util.subproj/rcmd.c",
+    ],
+    raw_headers = glob(["**/*.h"]),
+    compiler_flags = [
+        "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+        # Libinfo's private and installed headers (libinfo_common.h, od_debug.h,
+        # ils.h, membership.h, ...) and the <rpc/>, <rpcsvc/> root come before
+        # the libc include dirs, so they are the ones these sources see.
+        "-Iuserspace/libinfo/Libinfo",
+        "-Iuserspace/libinfo/lookup.subproj",
+        "-Iuserspace/libinfo/membership.subproj",
+        "-Iuserspace/libinfo/gen.subproj",
+        "-Iuserspace/libinfo/nis.subproj",
+        "-I$(location :libinfo_rpc_include)",
+        # <bootstrap_priv.h> (liblaunch, installed to /usr/local/include).
+        "-Iuserspace/launchd/liblaunch",
+        # Xcode GCC_PREPROCESSOR_DEFINITIONS (Libinfo.xcconfig, macosx). DEBUG is
+        # the Release value: this is the normal, non-debug archive.
+        "-DDEBUG=0",
+        "-D__MigTypeCheck=1",
+        "-DINET6=1",
+        "-DCONFIG_MAC",
+        "-DDARWIN_DIRECTORY_AVAILABLE",
+        "-DDS_AVAILABLE",
+        "-DSYNTH_ROOTFS",
+        # The SDK's stdio/stdlib/... come from the libc public headers, as in
+        # libc_sources(): -nostdlibinc is set, so this root must be present.
+        "-Iuserspace/libc/include",
+        # rpc.subproj still has K&R definitions (pmap_prot.c, authunix_prot.c);
+        # Apple's compiler accepted them under GCC_TREAT_WARNINGS_AS_ERRORS.
+        "-Wno-error=deprecated-non-prototype",
+    ] + LIBC_BASE_FLAGS + LIBC_INCLUDE_FLAGS,
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    deps = [
+        ":libinfo_rpc_include",
+        "//userspace/AvailabilityVersions:headers",
+        "//:userspace_generated",
+        "//userspace/libc:libc_features",
+        "//userspace:system_headers",
+    ],
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

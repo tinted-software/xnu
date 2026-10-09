@@ -1,0 +1,13 @@
+{
+  "project": "IOKitUser",
+  "repository": "https://github.com/apple-oss-distributions/IOKitUser",
+  "tag": "IOKitUser-100231.120.3",
+  "commit": "23a611d9d194b63465f6df2abfdda63d71c87e97",
+  "header_exports": {
+    "IOKit/IOKitLib.h": "IOKitLib.h",
+    "IOKit/IOCFPlugIn.h": "IOCFPlugIn.h"
+  },
+  "notes": [
+    "Existing imported IOKitLib.h, IOCFPlugIn.h and APPLE_LICENSE match this pinned release byte-for-byte; they retain their original source locations and are installed by Buck header staging."
+  ]
+}

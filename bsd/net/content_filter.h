@@ -31,7 +31,7 @@
 #include <sys/syslog.h>
 #include <netinet/in.h>
 #include <stdint.h>
-#include <corecrypto/ccsha2.h>
+#include <libkern/crypto/ccdigest_abi.h>
 
 #ifdef BSD_KERNEL_PRIVATE
 #include <sys/mbuf.h>

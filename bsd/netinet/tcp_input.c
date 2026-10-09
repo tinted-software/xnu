@@ -136,7 +136,7 @@
 #include <netinet/mptcp_opt.h>
 #endif /* MPTCP */
 
-#include <corecrypto/ccaes.h>
+#include <libkern/crypto/ccmode_abi.h>
 #include <net/sockaddr_utils.h>
 
 #define DBG_LAYER_BEG           NETDBG_CODE(DBG_NETTCP, 0)

@@ -34,13 +34,16 @@ extern "C"
 {
 #endif
 
-#include <corecrypto/ccmode.h>
-#include <corecrypto/ccaes.h>
-#include <corecrypto/ccn.h>
+#include <libkern/crypto/ccmode_abi.h>
 
-//Unholy HACK: this works because we know the size of the context for every
-//possible corecrypto implementation is less than this.
+/* Fixed public storage capacity, retained independently of the provider. */
 #define AES_XTS_CTX_MAX_SIZE (ccn_sizeof_size(3*sizeof(void *)) + 2*ccn_sizeof_size(128*4) + ccn_sizeof_size(16))
+
+#ifdef __cplusplus
+static_assert(AES_XTS_CTX_MAX_SIZE >= XNU_RC_AES_XTS_CTX_SIZE, "XTS context capacity");
+#else
+_Static_assert(AES_XTS_CTX_MAX_SIZE >= XNU_RC_AES_XTS_CTX_SIZE, "XTS context capacity");
+#endif
 
 typedef struct {
 	ccxts_ctx_decl(AES_XTS_CTX_MAX_SIZE, enc);

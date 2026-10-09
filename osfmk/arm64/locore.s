@@ -910,6 +910,16 @@ el1_sp1_serror_vector_long:
 #if __ARM_KERNEL_PROTECT__
 	mov		x18, #0 						// Zero x18 to avoid leaking data to user SS
 #endif
+#if EMULATE_USER_A_KEYS_OFF
+	/* A keys may be off for a keys-off thread; the kernel needs them before any auth. */
+	mrs		x0, SCTLR_EL1
+	tbnz	x0, #SCTLR_PACIA_ENABLED_SHIFT, Lel0_a_keys_on_\@
+	orr		x0, x0, #(SCTLR_PACIA_ENABLED)
+	orr		x0, x0, #(SCTLR_PACDA_ENABLED)
+	msr		SCTLR_EL1, x0
+	isb		sy
+Lel0_a_keys_on_\@:
+#endif /* EMULATE_USER_A_KEYS_OFF */
 	mrs		x0, TPIDR_EL1						// Load the thread register
 	LOAD_USER_PCB	dst=x0, src=x0, tmp=x1		// Load the user context pointer
 	mrs		x1, SP_EL0							// Load the user stack pointer
@@ -2062,6 +2072,25 @@ Lno_gcr_mask_el0_reset:
 	isb		sy
 Lskip_eret_isb:
 #endif /* ERET_NEEDS_ISB */
+
+#if EMULATE_USER_A_KEYS_OFF
+	/*
+	 * Returning to EL0 of a keys-off thread: turn the A keys off so its A-key
+	 * PAC instructions are no-ops, as on Apple CPUs. No A-key instruction runs
+	 * between here and eret; EL0 entry turns them back on.
+	 */
+	ldr		w2, [x0, SS64_CPSR]
+	tbnz	w2, PSR64_MODE_EL_SHIFT, Lexit_a_keys_done
+	mrs		x1, TPIDR_EL1
+	ldr		w2, [x1, TH_ARM_MACHINE_FLAGS]
+	tbz		w2, #ARM_MACHINE_THREAD_DISABLE_USER_JOP_SHIFT, Lexit_a_keys_done
+	mrs		x3, SCTLR_EL1
+	bic		x3, x3, #(SCTLR_PACIA_ENABLED)
+	bic		x3, x3, #(SCTLR_PACDA_ENABLED)
+	msr		SCTLR_EL1, x3
+	isb		sy
+Lexit_a_keys_done:
+#endif /* EMULATE_USER_A_KEYS_OFF */
 
 	/* Restore arm_saved_state64 */
 

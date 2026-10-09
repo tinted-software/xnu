@@ -1104,6 +1104,14 @@ IOMallocData_external(vm_size_t size)
 	return IOMalloc_internal(KHEAP_DATA_PRIVATE, size, Z_VM_TAG_BT_BIT);
 }
 
+/* Preserve the exported allocator ABI independently of the in-kernel macro. */
+void *(IOMallocData)(vm_size_t size);
+void *
+(IOMallocData)(vm_size_t size)
+{
+	return IOMallocData_external(size);
+}
+
 void *
 IOMallocZeroData_external(
 	vm_size_t size);

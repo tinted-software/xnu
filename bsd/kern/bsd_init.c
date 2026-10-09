@@ -962,8 +962,15 @@ bsd_init(void)
 		/* Non MacOS */
 		require_rootauth = TRUE;
 #endif // XNU_TARGET_OS_OSX && defined(__arm64__)
+		/*
+		 * Stand-in: apfsro (the QEMU APFS root) has no seal verification, so
+		 * FSIOC_KERNEL_ROOTAUTH cannot succeed. Its root is read-only and
+		 * unverified; flagged in the port report.
+		 */
+		boolean_t apfsro_root = (rootvnode->v_mount->mnt_vtable != NULL &&
+		    strcmp(rootvnode->v_mount->mnt_vtable->vfc_name, "apfs") == 0);
 
-		if (require_rootauth) {
+		if (require_rootauth && !apfsro_root) {
 			/* enforce sealedness */
 			int autherr = VNOP_IOCTL(rootvnode, FSIOC_KERNEL_ROOTAUTH, NULL, 0, vfs_context_kernel());
 			if (autherr) {

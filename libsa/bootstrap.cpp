@@ -735,17 +735,16 @@ KLDBootstrap::readBuiltinPersonalities(void)
 			continue;
 		}
 
+		/* No bundle identifier marks an in-kernel driver (see
+		 * IOCatalogue::isModuleLoaded); its personalities get none either. */
 		moduleName = OSDynamicCast(OSString,
 		    infoDict->getObject(kCFBundleIdentifierKey));
-		if (!moduleName) {
-			continue;
-		}
 
 		OSKextLog(/* kext */ NULL,
 		    kOSKextLogStepLevel |
 		    kOSKextLogLoadFlag,
 		    "Adding personalities for built-in driver %s:",
-		    moduleName->getCStringNoCopy());
+		    moduleName ? moduleName->getCStringNoCopy() : "(in-kernel)");
 
 		personalities = OSDynamicCast(OSDictionary,
 		    infoDict->getObject("IOKitPersonalities"));
@@ -769,7 +768,7 @@ KLDBootstrap::readBuiltinPersonalities(void)
 			    "Adding built-in driver personality %s.",
 			    personalityName->getCStringNoCopy());
 
-			if (personality && !personality->getObject(kCFBundleIdentifierKey)) {
+			if (personality && moduleName && !personality->getObject(kCFBundleIdentifierKey)) {
 				personality->setObject(kCFBundleIdentifierKey, moduleName);
 			}
 			allPersonalities->setObject(personality);

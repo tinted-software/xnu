@@ -1,0 +1,326 @@
+load(":headers.bzl", "libcxx_config_site", "prebuilt_loader_version")
+load("//userspace/libc:sources.bzl", "LIBC_INCLUDE_FLAGS")
+load(
+    ":sources.bzl",
+    "DYLD_COMMON_SRCS",
+    "DYLD_INTROSPECTION_SRC",
+    "DYLD_LIBDYLD_SRCS",
+    "DYLD_LSL_SRCS",
+    "DYLD_RUNTIME_SRCS",
+    "DYLD_VERSION",
+    "INTROSPECTION_COMMON_SRCS",
+    "INTROSPECTION_LSL_SRCS",
+    "MACH_O_SRCS",
+)
+load("//xnu:kernel.bzl", "target_triple")
+
+_PLATFORM = "//platforms:aarch64-darwin"
+_LOCAL_HEADERS = glob([
+    "common/**/*.h", "dyld/**/*.h", "lsl/**/*.h", "mach_o/**/*.h",
+    "libdyld/**/*.h", "libdyld_introspection/**/*.h", "cache_builder/**/*.h",
+    "include/**/*.h",
+])
+
+# Export real install namespaces, not a flattened collection of unrelated SDK
+# files. Private implementation headers retain their source-directory namespace.
+cxx_library(
+    name = "headers",
+    header_namespace = "",
+    exported_headers = dict(
+        [(path[len("include/"):], path) for path in glob(["include/**/*.h"])] +
+        [(path, path) for path in _LOCAL_HEADERS if not path.startswith("include/")],
+    ),
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+libcxx_config_site(
+    name = "libcxx_config_site",
+    default_target_platform = _PLATFORM,
+)
+# libc++ generates <__assertion_handler> from LIBCXX_ASSERTION_HANDLER_FILE at
+# CMake configure time. The default (CMakeLists.txt:97) is the vendor template
+# with no substitutions, so installing that file unchanged is the same output.
+genrule(
+    name = "libcxx_assertion_handler",
+    out = "__assertion_handler",
+    srcs = ["//:libcxx_default_assertion_handler"],
+    cmd = "cp $(location //:libcxx_default_assertion_handler) $OUT",
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+cxx_library(
+    name = "libcxx_headers",
+    header_namespace = "",
+    exported_headers = {
+        "__config_site": ":libcxx_config_site",
+        "__assertion_handler": ":libcxx_assertion_handler",
+    },
+    exported_preprocessor_flags = [
+        "-nostdinc++",
+        "-I", "subprojects/llvm-project/libcxx/include",
+    ],
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+prebuilt_loader_version(
+    name = "prebuilt_loader_version",
+    headers = _LOCAL_HEADERS,
+    libcxx_site = ":libcxx_config_site",
+    libcxx_assertion_handler = ":libcxx_assertion_handler",
+    system_headers = "//userspace:system_headers",
+    userspace_generated = "//:userspace_generated",
+    libc_features = "//userspace/libc:libc_features",
+    availability_headers = "//userspace/AvailabilityVersions:headers",
+    system_framework_headers = "//:system_framework_headers",
+    default_target_platform = _PLATFORM,
+)
+
+# Release settings from base.xcconfig. The C2x and C++20 modes must not be
+# applied to assembler; upstream lower-case .s files explicitly need the C
+# preprocessor for their ARM64/TargetConditionals branches.
+_FLAGS = [
+    "-target", target_triple(),
+    "-nostdlibinc", "-Os", "-fblocks", "-fvisibility-inlines-hidden",
+    "-Xclang", "-target-feature", "-Xclang", "+mte",
+    "-DPRIVATE", "-D__APPLE_API_PRIVATE",
+    "-D_LIBCPP_NO_EXCEPTIONS=1",
+    "-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_NONE",
+    # Single modern macOS ABI, as libc builds with (libc-features.h checks these).
+    "-D__DARWIN_UNIX03=1", "-D__DARWIN_64_BIT_INO_T=1", "-D__DARWIN_NON_CANCELABLE=1",
+    "-D__DARWIN_VERS_1050=1", "-D__DARWIN_ONLY_VERS_1050=1",
+    "-D__DARWIN_ONLY_UNIX_CONFORMANCE=1", "-D__DARWIN_ONLY_64_BIT_INO_T=1",
+    "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+    "-I$(location //userspace/AvailabilityVersions:headers)",
+    "-I$(location //userspace:system_headers)",
+    "-I$(location //:userspace_generated)/include",
+    "-I$(location //userspace/libc:libc_features)/arm64",
+    "-Iuserspace/dyld/dyld", "-Iuserspace/dyld/common",
+    "-Iuserspace/dyld/mach_o", "-Iuserspace/dyld/lsl",
+    "-Iuserspace/dyld/libdyld", "-Iuserspace/dyld/include",
+    "-Iuserspace/dyld/include/mach-o", "-Iuserspace/dyld/cache_builder",
+    "-Iuserspace/libc/include", "-Iuserspace/libc/darwin",
+    "-IEXTERNAL_HEADERS", "-Iuserspace/CarbonHeaders/include",
+    "-Iuserspace/corecrypto_compat/include", "-Iuserspace/launchd/liblaunch",
+    "-Iuserspace/dyld/compat/include", "-Iuserspace/dyld/other-tools",
+    "-Ilibsyscall/wrappers",
+] + LIBC_INCLUDE_FLAGS + [
+    "-I$(location //:system_framework_headers)",
+]
+_LANG_FLAGS = {
+    "c": ["-std=c2x", "-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h", "-include", "os/thread_self_restrict.h"],
+    "cxx": ["-std=c++20", "-fno-exceptions", "-fno-rtti", "-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h", "-include", "os/thread_self_restrict.h"],
+}
+_HEADER_DEPS = [
+    ":headers", ":libcxx_headers",
+    "//userspace:system_headers", "//userspace/libc:libc_features",
+    "//:userspace_generated", "//userspace/AvailabilityVersions:headers", "//:system_framework_headers",
+    "//userspace/libplatform:headers", "//userspace/libmalloc:headers",
+]
+_DYLD_FLAGS = [
+    "-DBUILDING_DYLD=1",
+    "-DDYLD_VERSION=" + read_config("dyld", "source_version", DYLD_VERSION),
+]
+
+# All emitted archives have native PIC object actions; there is no genrule
+# compilation driver and no prebuilt-library wrapper around manually built .o's.
+# libmach_o's own configuration is INTERNAL_BUILD, not BUILDING_DYLD.
+cxx_library(
+    name = "libmach_o",
+    srcs = MACH_O_SRCS,
+    headers = dict([(path, path) for path in _LOCAL_HEADERS]),
+    header_namespace = "",
+    deps = _HEADER_DEPS,
+    exported_deps = [":headers", ":libcxx_headers"],
+    compiler_flags = _FLAGS + ["-DINTERNAL_BUILD=1", "-fvisibility=hidden"],
+    lang_compiler_flags = _LANG_FLAGS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "liblsl_dyld",
+    srcs = [
+        (path, ["-x", "assembler-with-cpp"]) if path.endswith(".s") else path
+        for path in DYLD_LSL_SRCS
+    ],
+    headers = dict([(path, path) for path in _LOCAL_HEADERS]),
+    header_namespace = "",
+    deps = _HEADER_DEPS,
+    exported_deps = [":headers", ":libcxx_headers"],
+    compiler_flags = _FLAGS + _DYLD_FLAGS,
+    lang_compiler_flags = _LANG_FLAGS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "dyld_common_objects",
+    srcs = DYLD_COMMON_SRCS,
+    headers = dict([(path, path) for path in _LOCAL_HEADERS]),
+    header_namespace = "",
+    deps = _HEADER_DEPS + [":libmach_o", ":liblsl_dyld"],
+    exported_deps = [":headers", ":libcxx_headers"],
+    compiler_flags = _FLAGS + _DYLD_FLAGS,
+    lang_compiler_flags = _LANG_FLAGS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+# dyld-mighty compiles this TU directly with BUILDING_DYLD. The standalone
+# libdyld_introspection_static archive below has different allocator/layout
+# configuration and overlapping common sources; it is not its substitute.
+cxx_library(
+    name = "dyld_introspection_objects",
+    srcs = [DYLD_INTROSPECTION_SRC],
+    headers = dict([(path, path) for path in _LOCAL_HEADERS]),
+    header_namespace = "",
+    deps = _HEADER_DEPS + [":dyld_common_objects"],
+    compiler_flags = _FLAGS + _DYLD_FLAGS,
+    lang_compiler_flags = _LANG_FLAGS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "dyld_runtime_objects",
+    srcs = [
+        (path, ["-x", "assembler-with-cpp"]) if path.endswith(".s") else path
+        for path in DYLD_RUNTIME_SRCS
+    ],
+    headers = dict([(path, path) for path in _LOCAL_HEADERS] + [
+        ("PrebuiltLoader_version.h", ":prebuilt_loader_version"),
+    ]),
+    header_namespace = "",
+    deps = _HEADER_DEPS + [
+        ":dyld_common_objects", ":dyld_introspection_objects",
+        ":libmach_o", ":liblsl_dyld",
+        "//userspace/libc:libc_dyld",
+        "//userspace/libplatform:libsystem_platform_dyld",
+    ],
+    exported_deps = [":headers", ":libcxx_headers"],
+    compiler_flags = _FLAGS + _DYLD_FLAGS,
+    lang_compiler_flags = _LANG_FLAGS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+# Complete standalone synchronized-target membership, with its own exact macro.
+# Do not use this in dyld_runtime_objects: it would duplicate runtime symbols.
+cxx_library(
+    name = "libdyld_introspection",
+    srcs = INTROSPECTION_COMMON_SRCS + INTROSPECTION_LSL_SRCS + [DYLD_INTROSPECTION_SRC],
+    headers = dict([(path, path) for path in _LOCAL_HEADERS]),
+    header_namespace = "",
+    deps = _HEADER_DEPS + [":libmach_o"],
+    exported_deps = [":headers", ":libcxx_headers"],
+    compiler_flags = _FLAGS + [
+        "-DBUILDING_LIBDYLD_INTROSPECTION_STATIC=1", "-fvisibility=hidden",
+    ],
+    lang_compiler_flags = _LANG_FLAGS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+# //userspace/dyld:dyld (below) links the MH_DYLINKER image from this port's
+# static archives. The link is closed: -nostdlib, no dynamic_lookup, no SDK
+# placeholders. It relies on -dead_strip, as upstream does (DEAD_CODE_STRIPPING
+# in configs/base.xcconfig): archive members reference symbols dyld never calls
+# (e.g. thread entry points, malloc), which only matter if live code uses them.
+
+# Port-policy providers for Apple's unpublished libamfi / sandbox /
+# CrashReporterClient (see compat/compat.c: permissive AMFI, non-denying
+# sandbox, crash message in __crashreporter_info__).
+cxx_library(
+    name = "dyld_compat",
+    srcs = ["compat/compat.c"],
+    raw_headers = glob(["compat/include/**/*.h"]),
+    compiler_flags = ["-include", "EXTERNAL_HEADERS/xros_availability_aliases.h"] + _FLAGS,
+    lang_compiler_flags = {"c": ["-std=c2x", "-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"]},
+    deps = _HEADER_DEPS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+# The dynamic linker image, linked as dyld.xcconfig does: a dylinker with
+# __dyld_start as entry, no libSystem (-nostdlib), no initializers.
+cxx_binary(
+    name = "dyld",
+    deps = [":dyld_runtime_objects", ":dyld_compat", "//:libsystem_kernel_static", "//:libsystem_pthread_dyld", "//userspace/corecrypto_compat:ccsha2", "//userspace/libc:FortifySource", ":libcxx_dyld"],
+    linker_flags = [
+        "-nostdlib",
+        "-Wl,-e,__dyld_start",
+        "-Wl,-exported_symbol,__dyld_start",
+        "-Wl,-exported_symbol,_lldb_image_notifier",
+        "-Wl,-exported_symbol,_dyld_all_image_infos",
+        "-Wl,-no_inits",
+        "-Wl,-dead_strip",
+        "-Wl,-dylinker",
+        "-Wl,-dylinker_install_name,/usr/lib/dyld",
+        "-Wl,-fixup_chains",
+        "-Wl,-data_const",
+    ],
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+# The part of libc++'s compiled library that dyld references. Upstream links a
+# dyld-local libc++.a; only std::__hash_memory (src/functional.cpp) survives
+# dead stripping here. Built as the library itself, with exceptions off to match
+# dyld's configuration.
+cxx_library(
+    name = "libcxx_dyld",
+    srcs = ["//:libcxx_functional_src"],
+    deps = _HEADER_DEPS,
+    exported_deps = [":libcxx_headers"],
+    compiler_flags = _FLAGS + ["-D_LIBCPP_BUILDING_LIBRARY", "-fno-exceptions", "-fno-rtti"],
+    lang_compiler_flags = _LANG_FLAGS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+# The dyld client library (libdyld.dylib). Built as BUILDING_LIBDYLD, not
+# BUILDING_DYLD: the client talks to dyld only through the gAPIs pointer
+# (libdyldGlue.cpp), so it must not link dyld's runtime objects. Sources are
+# listed in sources.bzl:DYLD_LIBDYLD_SRCS.
+cxx_library(
+    name = "libdyld_client_objects",
+    srcs = [
+        (path, ["-x", "assembler-with-cpp"]) if path.endswith(".s") else path
+        for path in DYLD_LIBDYLD_SRCS
+    ],
+    headers = dict([(path, path) for path in _LOCAL_HEADERS]),
+    header_namespace = "",
+    deps = _HEADER_DEPS + [":libmach_o"],
+    exported_deps = [":headers", ":libcxx_headers"],
+    compiler_flags = _FLAGS + ["-DBUILDING_LIBDYLD=1"],
+    lang_compiler_flags = _LANG_FLAGS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)

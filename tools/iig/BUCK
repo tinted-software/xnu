@@ -1,0 +1,21 @@
+cxx_binary(
+    name = "iig",
+    srcs = [
+        "src/codegen.cpp",
+        "src/main.cpp",
+        "src/parse.cpp",
+    ],
+    headers = [
+        "include/ast.h",
+    ],
+    header_namespace = "",
+    include_directories = [
+        "include",
+    ],
+    compiler_flags = [
+        "-Wno-unused-function",
+        "-O2",
+    ],
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)

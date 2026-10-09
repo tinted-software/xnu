@@ -1,0 +1,16 @@
+# os/feature_private.h, generated from the per-domain feature-flag plists.
+# Domains: libmalloc (no configured flags yet; every call uses its fallback)
+# and Libsystem (posix_spawn_filtering). Add plists here to configure flags.
+genrule(
+    name = "headers",
+    srcs = [
+        "//userspace/libmalloc/featureflags:libmalloc.plist",
+        "//userspace/libsystem/featureflags:Libsystem.plist",
+    ],
+    out = "include",
+    cmd = "$(exe //tools/featureflags:featureflags) -o $OUT " +
+          "libmalloc=$(location //userspace/libmalloc/featureflags:libmalloc.plist) " +
+          "Libsystem=$(location //userspace/libsystem/featureflags:Libsystem.plist)",
+    visibility = ["PUBLIC"],
+    default_target_platform = "//platforms:host",
+)

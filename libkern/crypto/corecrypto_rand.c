@@ -27,7 +27,7 @@
  */
 
 #include <libkern/crypto/crypto_internal.h>
-#include <corecrypto/ccrng.h>
+#include <prng/ccrng_abi.h>
 #include <libkern/crypto/rand.h>
 
 int

@@ -46,7 +46,7 @@
 #include <stdint.h>
 #include <sys/cdefs.h>
 
-#include <corecrypto/ccmode.h>
+#include <libkern/crypto/ccmode_abi.h>
 
 __BEGIN_DECLS
 

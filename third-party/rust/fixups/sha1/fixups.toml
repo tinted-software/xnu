@@ -1,0 +1,5 @@
+rustc_flags = [
+    "--cfg",
+    'sha1_backend="soft"',
+]
+omit_deps = ["cpufeatures"]

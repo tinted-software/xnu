@@ -1,0 +1,2 @@
+rustc_flags = ["--cfg", "chacha20_force_soft"]
+omit_deps = ["cpufeatures"]

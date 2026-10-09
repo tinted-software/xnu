@@ -34,7 +34,7 @@ extern "C"
 {
 #endif
 
-#include <corecrypto/ccchacha20poly1305.h>
+#include <libkern/crypto/aead_abi.h>
 
 typedef ccchacha20poly1305_ctx chacha20poly1305_ctx;
 

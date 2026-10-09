@@ -1,5 +1,0 @@
-[wrap-git]
-url = https://github.com/apple-oss-distributions/libpthread.git
-revision = 1f4f5265b319111142f1bf3a27d4484ef5a98314
-depth = 1
-patch_directory = libpthread

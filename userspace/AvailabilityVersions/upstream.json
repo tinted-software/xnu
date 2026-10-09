@@ -1,0 +1,99 @@
+{
+  "project": "AvailabilityVersions",
+  "repository": "https://github.com/apple-oss-distributions/AvailabilityVersions",
+  "tag": "AvailabilityVersions-157.2",
+  "commit": "149b1777f3e8c2133042d8e188f72e3adf6a7110",
+  "files": [
+    {
+      "path": "availability",
+      "upstream_path": "availability",
+      "upstream_sha256": "62bd918c5a58cd5853cfd10af5469530ab464f6a4dc6fe3a917fcc22701305fd",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "availability.dsl",
+      "upstream_path": "availability.dsl",
+      "upstream_sha256": "1d09c3e8d7c6b69fa8d5aa7645cc024075f9d1de097cf28c105524314c67fa65",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/Availability.h",
+      "upstream_path": "templates/Availability.h",
+      "upstream_sha256": "502ece28780adf5447166e3f599c8e7201cf906d13f69b81673d88e71d006c2a",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/AvailabilityInternal.h",
+      "upstream_path": "templates/AvailabilityInternal.h",
+      "upstream_sha256": "eb0a2c48ec21cf38d0af4de1b156f0447399e9e0cc0acb565a8a6c2cc6b55e47",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/AvailabilityInternalLegacy.h",
+      "upstream_path": "templates/AvailabilityInternalLegacy.h",
+      "upstream_sha256": "4c15ffce0467946a20beaa2eb25eba2cbe1788c620aaeb2516c39436a88fe276",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/AvailabilityInternalPrivate.h",
+      "upstream_path": "templates/AvailabilityInternalPrivate.h",
+      "upstream_sha256": "6bdbc76c8455f6d55e925dfafa28e6b49b133a5f5e2c7d5fd13e610ab7d71173",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/AvailabilityMacros.h",
+      "upstream_path": "templates/AvailabilityMacros.h",
+      "upstream_sha256": "4dad500fe4fcabcbf1f013945411cad7dc1172f890f05cd68e0b55eca5e842c4",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/AvailabilityProhibitedInternal.h",
+      "upstream_path": "templates/AvailabilityProhibitedInternal.h",
+      "upstream_sha256": "738b9b48107d22f85613bd8f9418140cbf09424d4fd78db33327bb8c25ac6dff",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/AvailabilityVersions.h",
+      "upstream_path": "templates/AvailabilityVersions.h",
+      "upstream_sha256": "440ee4eb5f96942bc6f14af9f1af71f316e643c364a1ef9584a7421f182c4cea",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/VersionMap.h",
+      "upstream_path": "templates/VersionMap.h",
+      "upstream_sha256": "542a11482ee8ef7214c68c24fdb164f7aea64e3d75ad00c977aa94880c30b1b9",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/dyld_version_defines.h",
+      "upstream_path": "templates/dyld_version_defines.h",
+      "upstream_sha256": "3854526f0191dc2bdd466c590675a267c0e19bbab7c88741012014343ca19e5b",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "templates/os_availability.h",
+      "upstream_path": "templates/os_availability.h",
+      "upstream_sha256": "495f5869fb49a4245a7fafb7667f9869f3624d0908106a708e618c053eb66290",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    }
+  ],
+  "notes": [
+    "Authentic Apple availability generator, version DSL, and header templates. Buck generates the installed header tree with the upstream --preprocess interface; no compilation/linking driver is used.",
+    "APSL 2.0 and Apache 2.0 notices are retained in the respective source headers; standalone license texts are included because the upstream archive omits them.",
+    "Generated header root must precede EXTERNAL_HEADERS and any generated os/availability.h shim, so Availability.h and its internal/legacy/private/version headers come from one provider.",
+    "The upstream generator and build/test actions have not been executed during vendoring."
+  ],
+  "license_source": "https://github.com/apple-oss-distributions/CF/blob/dc54c6bb1c1e5e0b9486c1d26dd5bef110b20bf3/APPLE_LICENSE"
+}

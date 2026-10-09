@@ -1,0 +1,32 @@
+rust_library(
+    name = "xnurc",
+    srcs = glob(["src/**/*.rs"]),
+    crate_root = "src/lib.rs",
+    edition = "2021",
+    rustc_flags = [
+        "-C",
+        "panic=abort",
+        # The APFS mount path nests multi-KiB frames on the fixed-size kernel
+        # stack; unoptimized builds overflow it.
+        "-C",
+        "opt-level=s",
+    ],
+    deps = [
+        "//third-party/rust:aes",
+        "//third-party/rust:chacha20",
+        "//third-party/rust:crypto-bigint",
+        "//third-party/rust:des",
+        "//third-party/rust:ghash",
+        "//third-party/rust:hadris-apfs",
+        "//third-party/rust:hadris-fs",
+        "//third-party/rust:hadris-io",
+        "//third-party/rust:hadris-storage",
+        "//third-party/rust:md-5",
+        "//third-party/rust:poly1305",
+        "//third-party/rust:sha1",
+        "//third-party/rust:sha2",
+        "//third-party/rust:subtle",
+    ],
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

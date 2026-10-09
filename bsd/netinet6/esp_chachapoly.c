@@ -45,7 +45,7 @@
 #include <netinet6/esp_chachapoly.h>
 #include <netkey/key.h>
 #include <netkey/keydb.h>
-#include <corecrypto/cc.h>
+#include <libkern/crypto/cc_abi.h>
 #include <libkern/crypto/chacha20poly1305.h>
 
 #define ESP_CHACHAPOLY_SALT_LEN         4
@@ -255,7 +255,7 @@ esp_chachapoly_encrypt(struct mbuf *m, // head of mbuf chain
 	size_t len; // length of a given encryption round
 	const int32_t ivoff = (int32_t)off + (int32_t)sizeof(struct newesp); // IV offset
 	const size_t bodyoff = ivoff + ivlen; // body offset
-	int rc = 0; // return code of corecrypto operations
+	int rc = 0; // RustCrypto-backed kernel API status
 	struct newesp esp_hdr; // ESP header for AAD
 	_Static_assert(sizeof(esp_hdr) == 8, "Bad size");
 	uint32_t nonce[ESP_CHACHAPOLY_NONCE_LEN / 4]; // ensure 32bit alignment
@@ -400,7 +400,7 @@ esp_chachapoly_decrypt(struct mbuf *m, // head of mbuf chain
 	size_t len; // length of a given encryption round
 	const int32_t ivoff = (int32_t)off + (int32_t)sizeof(struct newesp); // IV offset
 	const int32_t bodyoff = ivoff + ivlen; // body offset
-	int rc = 0; // return code of corecrypto operations
+	int rc = 0; // RustCrypto-backed kernel API status
 	struct newesp esp_hdr; // ESP header for AAD
 	_Static_assert(sizeof(esp_hdr) == 8, "Bad size");
 	uint32_t nonce[ESP_CHACHAPOLY_NONCE_LEN / 4]; // ensure 32bit alignment
@@ -527,7 +527,7 @@ esp_chachapoly_encrypt_data(struct secasvar *sav,
 {
 	uint32_t nonce[ESP_CHACHAPOLY_NONCE_LEN / 4]; // ensure 32bit alignment
 	esp_chachapoly_ctx_t esp_ccp_ctx = NULL;
-	int rc = 0; // return code of corecrypto operations
+	int rc = 0; // RustCrypto-backed kernel API status
 
 	_Static_assert(sizeof(*esp_hdr) == 8, "Bad size");
 	_Static_assert(sizeof(nonce) == ESP_CHACHAPOLY_NONCE_LEN, "Bad nonce length");
@@ -620,7 +620,7 @@ esp_chachapoly_decrypt_data(struct secasvar *sav,
 {
 	uint32_t nonce[ESP_CHACHAPOLY_NONCE_LEN / 4]; // ensure 32bit alignment
 	esp_chachapoly_ctx_t esp_ccp_ctx = NULL;
-	int rc = 0; // return code of corecrypto operations
+	int rc = 0; // RustCrypto-backed kernel API status
 
 	_Static_assert(sizeof(nonce) == ESP_CHACHAPOLY_NONCE_LEN, "Bad nonce length");
 	_Static_assert(sizeof(*esp_hdr) == 8, "Bad size");

@@ -167,7 +167,7 @@ ZONE_DEFINE_TYPE(percpu_u64_zone, "percpu.64", uint64_t,
 #define ZONE_MAX_CHUNK_ALLOC_NUM        (10)
 #endif /* ZSECURITY_CONFIG(SAD_FENG_SHUI) */
 
-#if defined(ARM64_BOARD_CONFIG_QEMU)
+#if defined(ARM64_BOARD_CONFIG_QEMU) || defined(ARM64_BOARD_CONFIG_QEMU_ARM64E)
 /*
  * QEMU virt is compiled with XNU_PLATFORM_MacOSX, whose default zone
  * map is 128GB of VA. The 4K-page ARM64 kernel window is only 112GB

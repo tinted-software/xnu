@@ -725,6 +725,14 @@
 // 0     M              MMU enable
 #define SCTLR_M_ENABLED           (1ULL << 0)
 
+// 23    SPAN  Set Privileged Access Never on exception entry (RES1 before Armv8.1).
+// Without PAN support in the kernel, hardware must not set PAN on exception entry.
+#if __ARM_PAN_AVAILABLE__
+#define SCTLR_SPAN_DEFAULT        0
+#else
+#define SCTLR_SPAN_DEFAULT        (1ULL << 23)
+#endif
+
 #if APPLEVIRTUALPLATFORM
 #define SCTLR_EPAN_DEFAULT        0
 /* xnu tries to set SCTLR_EL1.EPAN = 1, but it may be RaZ/WI on some hosts */
@@ -777,7 +785,7 @@
 	 SCTLR_I_ENABLED | SCTLR_SED_DISABLED | SCTLR_CP15BEN_ENABLED | SCTLR_BT_DEFAULT | \
 	 SCTLR_SA0_ENABLED | SCTLR_SA_ENABLED | SCTLR_C_ENABLED | SCTLR_M_ENABLED |        \
 	 SCTLR_EPAN_DEFAULT | SCTLR_EIS_DEFAULT | SCTLR_EOS_DEFAULT | SCTLR_DSSBS_DEFAULT | \
-	 SCTLR_PAC_KEYS_DEFAULT | SCTLR_TP2_DEFAULT | SCTLR_OTHER)
+	 SCTLR_PAC_KEYS_DEFAULT | SCTLR_TP2_DEFAULT | SCTLR_SPAN_DEFAULT | SCTLR_OTHER)
 
 #define SCTLR_EL1_OPTIONAL \
 	(SCTLR_EPAN_OPTIONAL)
