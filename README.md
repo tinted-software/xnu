@@ -22,9 +22,4 @@ XNU runs on x86_64 and ARM64 for both single processor and multi-processor confi
 
 ## How to Build XNU
 
-### Building a `DEVELOPMENT` Kernel
-
-```sh
-meson setup --cross-file meson/cross/qemu-arm64.ini build
-ninja -C build
-```
+See [BUILDING.md](doc/BUCK2.md).

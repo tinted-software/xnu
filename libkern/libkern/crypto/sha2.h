@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#include <corecrypto/ccsha2.h>
+#include <libkern/crypto/ccdigest_abi.h>
 
 /*** SHA-256/384/512 Various Length Definitions ***********************/
 #define SHA256_BLOCK_LENGTH             CCSHA256_BLOCK_SIZE

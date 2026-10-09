@@ -190,6 +190,12 @@ StartIOKitMatching(void)
 	if (root && res && res->getParentEntry(gIOServicePlane) == NULL) {
 		res->attachToParent(root, gIOServicePlane);
 		kprintf("StartIOKitMatching: attached IOResources to service root\n");
+		/*
+		 * IOResources was registered before it joined the registry, when
+		 * registerService() could not match; register again now so the
+		 * built-in IOResources-provider personalities are matched.
+		 */
+		res->registerService();
 	}
 
 	bool ok = gRootNub->startIOServiceMatching();

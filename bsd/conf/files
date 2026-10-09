@@ -67,7 +67,8 @@ OPTIONS/fdesc				optional fdesc
 OPTIONS/fifo				optional fifo
 OPTIONS/devfs				optional devfs
 OPTIONS/routefs				optional routefs
-OPTIONS/mockfs				optional mockfs
+OPTIONS/apfsro				optional apfsro
+OPTIONS/tmpfs				optional tmpfs
 OPTIONS/crypto				optional crypto
 OPTIONS/fs_compression		optional fs_compression
 
@@ -153,9 +154,12 @@ bsd/miscfs/devfs/devfs_tree.c		optional devfs
 bsd/miscfs/devfs/devfs_vnops.c		optional devfs
 bsd/miscfs/devfs/devfs_vfsops.c		optional devfs
 
-bsd/miscfs/mockfs/mockfs_fsnode.c	optional mockfs
-bsd/miscfs/mockfs/mockfs_vfsops.c	optional mockfs
-bsd/miscfs/mockfs/mockfs_vnops.c	optional mockfs
+bsd/miscfs/apfsro/apfsro_node.c		optional apfsro
+bsd/miscfs/apfsro/apfsro_vfsops.c	optional apfsro
+bsd/miscfs/apfsro/apfsro_vnops.c	optional apfsro
+bsd/miscfs/tmpfs/tmpfs_subr.c		optional tmpfs
+bsd/miscfs/tmpfs/tmpfs_vfsops.c	optional tmpfs
+bsd/miscfs/tmpfs/tmpfs_vnops.c		optional tmpfs
 
 bsd/miscfs/routefs/routefs_ops.c	optional routefs
 

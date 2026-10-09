@@ -1,0 +1,27 @@
+{
+  "project": "IOFireWireFamily",
+  "repository": "https://github.com/apple-oss-distributions/IOFireWireFamily",
+  "tag": "IOFireWireFamily-492",
+  "commit": "ad9f879946570c786a80c731c8e9baaa490994ed",
+  "files": [
+    {
+      "path": "include/IOKit/firewire/IOFireWireLib.h",
+      "upstream_path": "IOFireWireLib.CFPlugInProj/IOFireWireLib.h",
+      "upstream_sha256": "47b62688bb4dce68842d2f89c239e452f7852eee39c4acd934e34ef96bdb1c7c",
+      "source_encoding": "mac_roman",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/IOKit/firewire/IOFireWireFamilyCommon.h",
+      "upstream_path": "IOFireWireFamily.kmodproj/IOFireWireFamilyCommon.h",
+      "upstream_sha256": "040a3af22363088d01a041ac7c212ea6e3d7778291a3e8299d0859caef56bbca",
+      "source_encoding": "mac_roman",
+      "vendored_encoding": "utf-8"
+    }
+  ],
+  "notes": [
+    "Header-only IOFireWireLib public API and family definitions from the latest OSS release.",
+    "Uses real CoreFoundation/CFPlugInCOM and IOKitUser declarations; no stub definitions or conditional omission of FireWire error tables.",
+    "Legacy Mac Roman source comments are losslessly transcoded to UTF-8. Declarations and definitions are unmodified."
+  ]
+}

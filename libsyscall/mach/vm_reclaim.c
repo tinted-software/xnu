@@ -33,6 +33,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <mach/error.h>
 #include <mach/kern_return.h>
 #include <mach/mach.h>

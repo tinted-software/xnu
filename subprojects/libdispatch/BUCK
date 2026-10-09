@@ -1,0 +1,195 @@
+load("//xnu:kernel.bzl", "target_triple")
+load("//xnu:subproject_defs.bzl", "subproject_library_args")
+
+cxx_library(**subproject_library_args(
+    name = "xnu_libdispatch",
+    subproject = "libdispatch",
+    lang = "c",
+    local = True,
+    extra_includes = [
+        "-Isubprojects/libdispatch/src/firehose",
+        "-Ilibkern/firehose",
+    ],
+    extra_defines = [
+        "-DKERNEL=1",
+        "-Wno-visibility",
+    ],
+))
+
+# ---------------------------------------------------------------------------
+# libdispatch (Darwin configuration) for the userspace umbrella. Sources follow
+# the Xcode "libdispatch" target's Sources phase (libdispatch.xcodeproj), minus:
+#   - src/introspection.c, src/shims.c: not in that phase (introspection variant
+#     and CMake-only respectively);
+#   - src/event/workqueue.c: not in that phase; the Darwin build uses the
+#     kernel pthread workqueue (libpthread), DISPATCH_USE_INTERNAL_WORKQUEUE=0;
+#   - object.m, data.m, client_callout.mm: ObjC; built with HAVE_OBJC=0 (no
+#     objc headers or libobjc in the tree), so OS_OBJECT_HAVE_OBJC1=0.
+# MIG (protocol.defs, firehose.defs, firehose_reply.defs) outputs are generated
+# here, as the Xcode "Mig Headers" phase and sourcecode.mig build rule do
+# (protocol: Client+Server; firehose: Client; firehose_reply: Server).
+# DTrace USDT probes are disabled (DISPATCH_USE_DTRACE=0): tools/dtrace cannot
+# yet parse provider.d (multi-line probe declarations; typedef'd argument types
+# need CTF encoding). The MIG invocations mirror userspace_generated's rules.
+# ---------------------------------------------------------------------------
+genrule(
+    name = "libdispatch_gen",
+    srcs = [
+        "//:kernel_mig_headers",
+        "src/protocol.defs",
+        "config/config.h",
+        "src/firehose/firehose.defs",
+        "src/firehose/firehose_reply.defs",
+        "src/firehose/firehose_types.defs",
+    ],
+    outs = {
+        "srcs": [
+            "protocolUser.c",
+            "protocolServer.c",
+            "firehoseUser.c",
+            "firehose_replyServer.c",
+        ],
+        "all": [
+            "config/config.h",
+            "protocolUser.c",
+            "protocolServer.c",
+            "firehoseUser.c",
+            "firehose_replyServer.c",
+            "protocol.h",
+            "protocolServer.h",
+            "firehose.h",
+            "firehoseServer.h",
+            "firehose_reply.h",
+            "firehose_replyServer.h",
+        ],
+    },
+    cmd = "set -e\n" +
+          "MIG=$(exe //tools/migcom:mig)\n" +
+          "D=subprojects/libdispatch/src\n" +
+          "BASE=\"-I$D -I$D/firehose -Iosfmk -Ibsd -IEXTERNAL_HEADERS -Ilibsyscall/mach\"\n" +
+          "$MIG $BASE -target arm64-apple-macos27.0.0 -user $OUT/protocolUser.c -header $OUT/protocol.h -server $OUT/protocolServer.c -sheader $OUT/protocolServer.h $D/protocol.defs\n" +
+          "$MIG $BASE -target arm64-apple-macos27.0.0 -user $OUT/firehoseUser.c -header $OUT/firehose.h -server /dev/null -sheader $OUT/firehoseServer.h $D/firehose/firehose.defs\n" +
+          "$MIG $BASE -target arm64-apple-macos27.0.0 -user /dev/null -header $OUT/firehose_reply.h -server $OUT/firehose_replyServer.c -sheader $OUT/firehose_replyServer.h $D/firehose/firehose_reply.defs\n" +
+          "mkdir -p $OUT/config\n" +
+          # Upstream config.h defines HAVE_OBJC 1 (no objc4 headers or libobjc in
+          # this tree) and HAVE_PTHREAD_MACHDEP_H 1 (pthread_machdep.h is not in the
+          # tree; direct TSD declarations come from libpthread's private/pthread/).
+          "sed -e 's/^#define HAVE_OBJC 1$/#define HAVE_OBJC 0/' -e 's/^#define HAVE_PTHREAD_MACHDEP_H 1$/#define HAVE_PTHREAD_MACHDEP_H 0/' subprojects/libdispatch/config/config.h > $OUT/config/config.h\n",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "libdispatch_objects",
+    srcs = [
+        "resolver/resolver.c",
+        "src/init.c",
+        "src/object.c",
+        "src/block.cpp",
+        "src/shims/lock.c",
+        "src/shims/yield.c",
+        "src/semaphore.c",
+        "src/once.c",
+        "src/eventlink.c",
+        "src/queue.c",
+        "src/apply.c",
+        "src/source.c",
+        "src/workgroup.c",
+        "src/mach.c",
+        "src/event/event.c",
+        "src/event/event_kevent.c",
+        "src/event/event_epoll.c",
+        "src/voucher.c",
+        "src/firehose/firehose_buffer.c",
+        "src/io.c",
+        "src/data.c",
+        "src/transform.c",
+        "src/time.c",
+        "src/allocator.c",
+        "src/benchmark.c",
+        ":libdispatch_gen[srcs]",
+    ],
+    deps = [
+        "//:userspace_generated",
+        "//:system_framework_headers",
+        "//userspace:system_headers",
+        "//userspace/AvailabilityVersions:headers",
+        "//userspace/libc:libc_features",
+        "//userspace/libplatform:headers",
+        "//userspace/libmalloc:headers",
+        "//userspace/dyld:libcxx_headers",
+    ],
+    compiler_flags = [
+        "-target", target_triple(),
+        "-nostdlibinc",
+        "-O2",
+        "-fblocks",
+        "-fno-common",
+        "-fno-stack-protector",
+        "-momit-leaf-frame-pointer",
+        "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+        "-DPRIVATE",
+        "-D__APPLE_API_PRIVATE",
+        "-D__DARWIN_ONLY_VERS_1050=1",
+        "-D__DARWIN_ONLY_UNIX_CONFORMANCE=1",
+        "-D__DARWIN_ONLY_64_BIT_INO_T=1",
+        "-D__LIBC__",
+        "-D_LIBC_NO_FEATURE_VERIFICATION=1",
+        "-D_FORTIFY_SOURCE=0",
+        "-DTARGET_OS_EXCLAVECORE=0",
+        "-DTARGET_OS_EXCLAVEKIT=0",
+        "-DDISPATCH_USE_DTRACE=0",
+        "-DOS_ATOMIC_CONFIG_MEMORY_ORDER_DEPENDENCY=1",
+        # internal.h has no default for this; upstream derives it from the
+        # deployment target (>= macOS 13 on arm64), which this target is.
+        "-DDISPATCH_SEND_ACTIVITY_IN_MSGV=1",
+        "-DNDEBUG",
+        "-I$(location :libdispatch_gen)",
+        "-I$(location //:userspace_generated)/include",
+        "-I$(location //userspace:system_headers)",
+        "-I$(location //userspace/AvailabilityVersions:headers)",
+        "-I$(location //userspace/libc:libc_features)/arm64",
+        "-I$(location //:system_framework_headers)",
+        "-Isubprojects/libdispatch",
+        "-Isubprojects/libdispatch/src",
+        "-Isubprojects/libdispatch/src/event",
+        "-Isubprojects/libdispatch/src/firehose",
+        "-Ilibsyscall/wrappers/libproc",
+        "-Isubprojects/libdispatch/private",
+        "-Iuserspace/libclosure",
+        "-Iuserspace/libc/include",
+        "-Iuserspace/libc",
+        "-Iuserspace/libc/darwin",
+        "-Iuserspace/libplatform/include",
+        "-Iuserspace/libplatform/private",
+        "-Iuserspace/libmalloc/include",
+        "-Iuserspace/libmalloc/private",
+        "-Isubprojects/libpthread/include",
+        "-Isubprojects/libpthread/private",
+        "-IEXTERNAL_HEADERS",
+        "-Ilibsyscall/mach",
+        "-Ilibsyscall",
+        "-Ilibsyscall/wrappers",
+        "-Iosfmk",
+        "-Ibsd",
+        "-Ilibkern",
+        "-Isubprojects/libpthread/include/pthread",
+    ],
+    lang_compiler_flags = {
+        "c": [
+            "-std=gnu11",
+            "-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h",
+        ],
+        "cxx": [
+            "-std=c++20",
+            "-fno-exceptions",
+            "-fno-rtti",
+            "-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h",
+        ],
+    },
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

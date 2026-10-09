@@ -1,0 +1,10 @@
+# Generates os/feature_private.h from per-domain feature-flag plists (main.rs).
+rust_binary(
+    name = "featureflags",
+    srcs = ["main.rs"],
+    crate = "featureflags",
+    crate_root = "main.rs",
+    edition = "2021",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)

@@ -1,5 +1,0 @@
-[wrap-git]
-url = https://github.com/apple/corecrypto.git
-revision = 9612a959abb6eac0aac3ee6a7245c46365c9d81b
-depth = 1
-patch_directory = corecrypto

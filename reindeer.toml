@@ -1,0 +1,4 @@
+# Configuration for reindeer
+third_party_dir = "third-party/rust"
+precise_srcs = true
+vendor = false

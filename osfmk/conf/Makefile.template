@@ -122,12 +122,6 @@ else
 	vm_sanitize_error_compat.o_VERIFIER = VERIFIER_NO_UBSAN_CHECKS
 endif
 
-cccbc.o_INCFLAGS += -I${SRCROOT}/EXTERNAL_HEADERS/corecrypto
-ccdrbg.o_INCFLAGS += -I${SRCROOT}/EXTERNAL_HEADERS/corecrypto
-ccgcm.o_INCFLAGS += -I${SRCROOT}/EXTERNAL_HEADERS/corecrypto
-ccmode_gcm_gf_mult.o_INCFLAGS += -I${SRCROOT}/EXTERNAL_HEADERS/corecrypto
-ccmode_gcm_mult_h.o_INCFLAGS += -I${SRCROOT}/EXTERNAL_HEADERS/corecrypto
-
 #
 # Enforce semantic types
 #
@@ -157,14 +151,6 @@ xcpm_fi.o_CWARNFLAGS_ADD += -Wno-atomic-implicit-seq-cst
 xcpm_idle.o_CWARNFLAGS_ADD += -Wno-atomic-implicit-seq-cst
 # -Wno-cast-align
 bsd_i386.o_CWARNFLAGS_ADD += -Wno-cast-align
-ccdigest_final_64be.o_CWARNFLAGS_ADD += -Wno-cast-align
-ccsha512_ltc_compress.o_CWARNFLAGS_ADD += -Wno-cast-align
-ccdigest_init.o_CWARNFLAGS_ADD += -Wno-cast-align
-ccdigest_update.o_CWARNFLAGS_ADD += -Wno-cast-align
-cchmac_final.o_CWARNFLAGS_ADD += -Wno-cast-align
-cchmac_init.o_CWARNFLAGS_ADD += -Wno-cast-align
-ccmode_gcm_gf_mult.o_CWARNFLAGS_ADD += -Wno-cast-align
-ccmode_gcm_mult_h.o_CWARNFLAGS_ADD += -Wno-cast-align
 commpage.o_CWARNFLAGS_ADD += -Wno-cast-align
 cpu_threads.o_CWARNFLAGS_ADD += -Wno-cast-align
 host.o_CWARNFLAGS_ADD += -Wno-cast-align

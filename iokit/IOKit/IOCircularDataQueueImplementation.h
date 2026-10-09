@@ -306,7 +306,11 @@ typedef struct IOCircularDataQueueDescription {
 #if __has_feature(ptrauth_calls)
 #include <ptrauth.h>
 #define OS_PTRAUTH_SIGNED_PTR(type) __ptrauth(ptrauth_key_process_independent_data, 1, ptrauth_string_discriminator(type))
+#if !defined(XNU_PTRAUTH_NO_AUTH_NULL_SCHEMA)
 #define OS_PTRAUTH_SIGNED_PTR_AUTH_NULL(type) __ptrauth(ptrauth_key_process_independent_data, 1, ptrauth_string_discriminator(type), "authenticates-null-values")
+#else
+#define OS_PTRAUTH_SIGNED_PTR_AUTH_NULL(type) __ptrauth(ptrauth_key_process_independent_data, 1, ptrauth_string_discriminator(type))
+#endif
 #define OS_PTRAUTH_DISCRIMINATOR(str) ptrauth_string_discriminator(str)
 #define __ptrauth_only
 #else //  __has_feature(ptrauth_calls)

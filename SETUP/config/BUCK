@@ -1,0 +1,59 @@
+genrule(
+    name = "parser_c",
+    srcs = ["parser.y"],
+    out = "parser.c",
+    cmd = "bison -y -d -d -o $OUT $SRCS",
+)
+
+genrule(
+    name = "parser_h",
+    srcs = ["parser.y"],
+    out = "parser.h",
+    cmd = "bison -y -d -d -o parser.c $SRCS && cp parser.h $OUT",
+)
+
+genrule(
+    name = "lexer_yy_c",
+    srcs = ["lexer.l"],
+    out = "lexer.yy.c",
+    cmd = "flex --header-file=lexer.yy.h -o $OUT $SRCS",
+)
+
+genrule(
+    name = "lexer_yy_h",
+    srcs = ["lexer.l"],
+    out = "lexer.yy.h",
+    cmd = "flex --header-file=$OUT -o lexer.yy.c $SRCS",
+)
+
+cxx_library(
+    name = "config_gen_hdrs",
+    header_namespace = "",
+    exported_headers = {
+        "config.h": "config.h",
+        "lexer.yy.h": ":lexer_yy_h",
+        "parser.h": ":parser_h",
+    },
+)
+cxx_binary(
+    name = "config",
+    srcs = [
+        "externs.c",
+        "main.c",
+        "mkheaders.c",
+        "mkioconf.c",
+        "mkmakefile.c",
+        "openp.c",
+        "searchp.c",
+        ":lexer_yy_c",
+        ":parser_c",
+    ],
+    headers = ["config.h"],
+    compiler_flags = [
+        "-DYY_NO_INPUT",
+        "-O2",
+    ],
+    deps = [":config_gen_hdrs"],
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)

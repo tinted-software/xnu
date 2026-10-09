@@ -118,7 +118,7 @@
 
 #include <net/net_osdep.h>
 #include <mach/sdt.h>
-#include <corecrypto/cc.h>
+#include <libkern/crypto/cc_abi.h>
 
 #if SKYWALK
 #include <skywalk/os_skywalk_private.h>

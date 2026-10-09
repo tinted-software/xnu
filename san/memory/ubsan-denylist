@@ -2,9 +2,6 @@
 src:./san/memory/ubsan.c
 src:./san/memory/ubsan_log.c
 
-[bounds]
-src:./osfmk/corecrypto/*
-
 [alignment]
 
 src:./libsa/bootstrap.cpp

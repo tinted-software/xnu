@@ -31,7 +31,7 @@
 
 __BEGIN_DECLS
 
-#include <corecrypto/cckprng.h>
+#include <prng/ccrng_abi.h>
 
 #ifdef XNU_KERNEL_PRIVATE
 

@@ -28,14 +28,31 @@
 
 #include <libkern/crypto/crypto_internal.h>
 #include <libkern/crypto/aes.h>
-#include <corecrypto/ccmode.h>
-#include <corecrypto/ccaes.h>
+#include <libkern/crypto/ccmode_abi.h>
+#include <libkern/crypto/aead_abi.h>
 #include <kern/debug.h>
+
+static int
+aes_key_bytes(int key_len)
+{
+	switch (key_len) {
+	case 16: case 24: case 32:
+		return key_len;
+	case 128: case 192: case 256:
+		return key_len / 8;
+	default:
+		return CCMODE_INVALID_INPUT;
+	}
+}
 
 aes_rval
 aes_encrypt_key(const unsigned char *key, int key_len, aes_encrypt_ctx cx[1])
 {
 	const struct ccmode_cbc *cbc = g_crypto_funcs->ccaes_cbc_encrypt;
+	key_len = aes_key_bytes(key_len);
+	if (key_len < 0) {
+		return key_len;
+	}
 
 	/* Make sure the context size for the mode fits in the one we have */
 	if (cbc->size > sizeof(aes_encrypt_ctx)) {
@@ -73,6 +90,10 @@ aes_rval
 aes_decrypt_key(const unsigned char *key, int key_len, aes_decrypt_ctx cx[1])
 {
 	const struct ccmode_cbc *cbc = g_crypto_funcs->ccaes_cbc_decrypt;
+	key_len = aes_key_bytes(key_len);
+	if (key_len < 0) {
+		return key_len;
+	}
 
 	/* Make sure the context size for the mode fits in the one we have */
 	if (cbc->size > sizeof(aes_decrypt_ctx)) {
@@ -135,6 +156,10 @@ aes_rval
 aes_encrypt_key_gcm(const unsigned char *key, int key_len, ccgcm_ctx *ctx)
 {
 	const struct ccmode_gcm *gcm = g_crypto_funcs->ccaes_gcm_encrypt;
+	key_len = aes_key_bytes(key_len);
+	if (key_len < 0) {
+		return key_len;
+	}
 	if (!gcm) {
 		return aes_error;
 	}
@@ -146,6 +171,10 @@ aes_rval
 aes_encrypt_key_with_iv_gcm(const unsigned char *key, int key_len, const unsigned char *in_iv, ccgcm_ctx *ctx)
 {
 	const struct ccmode_gcm *gcm = g_crypto_funcs->ccaes_gcm_encrypt;
+	key_len = aes_key_bytes(key_len);
+	if (key_len < 0) {
+		return key_len;
+	}
 	if (!gcm) {
 		return aes_error;
 	}
@@ -229,6 +258,10 @@ aes_rval
 aes_decrypt_key_gcm(const unsigned char *key, int key_len, ccgcm_ctx *ctx)
 {
 	const struct ccmode_gcm *gcm = g_crypto_funcs->ccaes_gcm_decrypt;
+	key_len = aes_key_bytes(key_len);
+	if (key_len < 0) {
+		return key_len;
+	}
 	if (!gcm) {
 		return aes_error;
 	}
@@ -240,6 +273,10 @@ aes_rval
 aes_decrypt_key_with_iv_gcm(const unsigned char *key, int key_len, const unsigned char *in_iv, ccgcm_ctx *ctx)
 {
 	const struct ccmode_gcm *gcm = g_crypto_funcs->ccaes_gcm_decrypt;
+	key_len = aes_key_bytes(key_len);
+	if (key_len < 0) {
+		return key_len;
+	}
 	if (!gcm) {
 		return aes_error;
 	}

@@ -1,94 +1,82 @@
+/* Built-in RustCrypto provider registration. This is not a loadable kmod or
+ * a FIPS-validated provider; no module-identity or POST-success API is exposed. */
 #define XNU_KERNEL_PRIVATE 1
-#include <mach/kmod.h>
-#include <mach/mach_types.h>
 #include <libkern/libkern.h>
+#include <libkern/crypto/register_crypto.h>
+#include <libkern/section_keywords.h>
 #include <kern/startup.h>
-#include <corecrypto/module_id.h>
-#include <corecrypto/ccdigest.h>
-#include <corecrypto/ccsha2.h>
 
-extern struct mach_header_64 _mh_execute_header;
-extern kern_return_t corecrypto_kext_start(kmod_info_t *ki, void *d);
-extern kern_return_t corecrypto_kext_stop(kmod_info_t *ki, void *d);
+#include <libkern/crypto/digest_kpi.h>
 
-kmod_info_t g_corecrypto_kmod_info = {
-	.next = NULL,
-	.info_version = KMOD_INFO_VERSION,
-	.id = (uint32_t)-1,
-	.name = "com.apple.kec.corecrypto",
-	.version = "1.0",
-	.reference_count = -1,
-	.reference_list = NULL,
-	.address = 0,
-	.size = 0,
-	.hdr_size = 0,
-	.start = corecrypto_kext_start,
-	.stop = corecrypto_kext_stop,
-};
+static SECURITY_READ_ONLY_LATE(struct crypto_functions) rustcrypto_functions;
 
 static void
-corecrypto_kmod_early_init(void)
+rustcrypto_register(void)
 {
-	if (g_corecrypto_kmod_info.address == 0) {
-		g_corecrypto_kmod_info.address = (vm_address_t)&_mh_execute_header;
+	rustcrypto_functions = (struct crypto_functions) {
+		.ccdigest_init_fn = ccdigest_init,
+		.ccdigest_update_fn = ccdigest_update,
+		.ccdigest_final_fn = xnu_rc_ccdigest_final,
+		.ccdigest_fn = ccdigest,
+		.ccmd5_di = ccmd5_di(),
+		.ccsha1_di = ccsha1_di(),
+		.ccsha256_di = ccsha256_di(),
+		.ccsha384_di = ccsha384_di(),
+		.ccsha512_di = ccsha512_di(),
+		.cchmac_init_fn = cchmac_init,
+		.cchmac_update_fn = cchmac_update,
+		.cchmac_final_fn = cchmac_final,
+		.cchmac_fn = cchmac,
+		.ccaes_ecb_encrypt = xnu_rc_aes_ecb_encrypt_mode(),
+		.ccaes_ecb_decrypt = xnu_rc_aes_ecb_decrypt_mode(),
+		.ccaes_cbc_encrypt = xnu_rc_aes_cbc_encrypt_mode(),
+		.ccaes_cbc_decrypt = xnu_rc_aes_cbc_decrypt_mode(),
+		.ccaes_ctr_crypt = xnu_rc_aes_ctr_crypt_mode(),
+		.ccaes_xts_encrypt = xnu_rc_aes_xts_encrypt_mode(),
+		.ccaes_xts_decrypt = xnu_rc_aes_xts_decrypt_mode(),
+		.ccaes_gcm_encrypt = xnu_rc_aes_gcm_encrypt_mode(),
+		.ccaes_gcm_decrypt = xnu_rc_aes_gcm_decrypt_mode(),
+		.ccgcm_init_with_iv_fn = ccgcm_init_with_iv,
+		.ccgcm_inc_iv_fn = ccgcm_inc_iv,
+		.ccchacha20poly1305_fns = xnu_rc_chacha20poly1305_fns(),
+		.ccdes_ecb_encrypt = xnu_rc_des_ecb_encrypt_mode(),
+		.ccdes_ecb_decrypt = xnu_rc_des_ecb_decrypt_mode(),
+		.ccdes_cbc_encrypt = xnu_rc_des_cbc_encrypt_mode(),
+		.ccdes_cbc_decrypt = xnu_rc_des_cbc_decrypt_mode(),
+		.cctdes_ecb_encrypt = xnu_rc_tdes_ecb_encrypt_mode(),
+		.cctdes_ecb_decrypt = xnu_rc_tdes_ecb_decrypt_mode(),
+		.cctdes_cbc_encrypt = xnu_rc_tdes_cbc_encrypt_mode(),
+		.cctdes_cbc_decrypt = xnu_rc_tdes_cbc_decrypt_mode(),
+		.ccdes_key_is_weak_fn = ccdes_key_is_weak,
+		.ccdes_key_set_odd_parity_fn = ccdes_key_set_odd_parity,
+		.ccpad_cts3_encrypt_fn = ccpad_cts3_encrypt,
+		.ccpad_cts3_decrypt_fn = ccpad_cts3_decrypt,
+		.ccrng_fn = ccrng,
+		.ccrsa_make_pub_fn = xnu_rc_ccrsa_make_pub,
+		.ccrsa_verify_pkcs1v15_fn = xnu_rc_ccrsa_verify_pkcs1v15,
+		.random_generate_fn = xnu_rc_rng_generate,
+		.random_uniform_fn = xnu_rc_rng_uniform,
+		.random_kmem_ctx_size_fn = xnu_rc_rng_ctx_size,
+		.random_kmem_init_fn = xnu_rc_rng_ctx_init,
+		.digest_ctx_size_fn = xnu_rc_digest_ctx_size,
+		.digest_init_fn = xnu_rc_digest_init,
+		.digest_update_fn = xnu_rc_digest_update,
+		.digest_final_fn = xnu_rc_digest_final,
+		.digest_fn = xnu_rc_digest,
+		.hmac_ctx_size_fn = xnu_rc_hmac_ctx_size,
+		.hmac_init_fn = xnu_rc_hmac_init,
+		.hmac_update_fn = xnu_rc_hmac_update,
+		.hmac_final_generate_fn = xnu_rc_hmac_final_generate,
+		.hmac_final_verify_fn = xnu_rc_hmac_final_verify,
+		.hmac_generate_fn = xnu_rc_hmac_generate,
+		.hmac_verify_fn = xnu_rc_hmac_verify,
+	};
+	if (register_crypto_functions(&rustcrypto_functions) != 0) {
+		panic("RustCrypto provider registered twice");
 	}
-	if (g_corecrypto_kmod_info.start) {
-		g_corecrypto_kmod_info.start(&g_corecrypto_kmod_info, NULL);
-	}
+	xnu_rc_rng_install();
 }
 
-STARTUP(EARLY_BOOT, STARTUP_RANK_FIRST, corecrypto_kmod_early_init);
-
-const char *cc_module_id(enum cc_module_id_format outformat)
-{
-	switch (outformat) {
-	case cc_module_id_Name:
-		return "Apple corecrypto Module (Kernel)";
-	case cc_module_id_Version:
-		return "1.0";
-	case cc_module_id_Full:
-	default:
-		return "Apple corecrypto Module v1.0 [Apple Silicon, Kernel, Software, SL1, N/A]";
-	}
-}
-
-extern void *IOMallocData_external(vm_size_t size);
-
-void *IOMallocData(vm_size_t size)
-{
-	return IOMallocData_external(size);
-}
-
-extern void AccelerateCrypto_SHA256_compress(uint32_t *c, size_t num, const void *p);
-extern void ccdigest_final_64be(const struct ccdigest_info *di, ccdigest_ctx_t ctx, unsigned char *digest);
-extern const uint32_t ccsha256_initial_state[8];
-
-static void ccsha256_ltc_compress_shim(ccdigest_state_t c, size_t num, const void *p)
-{
-	AccelerateCrypto_SHA256_compress((uint32_t *)c, num, p);
-}
-
-const struct ccdigest_info ccsha256_ltc_di = {
-	.output_size = 32,
-	.state_size = 32,
-	.block_size = 64,
-	.oid_size = 9,
-	.oid = (const unsigned char *)"\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01",
-	.initial_state = ccsha256_initial_state,
-	.compress = ccsha256_ltc_compress_shim,
-	.final = ccdigest_final_64be,
-	.impl = 3,
-};
-
-int fipspost_post_indicator(uint32_t fips_mode)
-{
-	(void)fips_mode;
-	return 0;
-}
-
-int fipspost_post_integrity(uint32_t fips_mode, struct mach_header *pmach_header)
-{
-	(void)fips_mode;
-	(void)pmach_header;
-	return 0;
-}
+/* VM initializes its per-CPU random contexts at EARLY_BOOT/MIDDLE; the
+ * provider selftest runs at EARLY_BOOT/LAST, before read-only lockdown. */
+STARTUP(EARLY_BOOT, STARTUP_RANK_FIRST, rustcrypto_register);

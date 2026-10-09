@@ -1,0 +1,82 @@
+load("//userspace/libc:sources.bzl", "LIBC_BASE_FLAGS", "LIBC_INCLUDE_FLAGS")
+
+# libsystem_notify client objects (libnotify.xcodeproj target "libnotify").
+# Sources: libnotify.c, notify_client.c, table.c, notify_probes.d, and the
+# client (Client attribute) halves of notify_ipc.defs / notify_old_ipc.defs.
+
+_PLATFORM = "//platforms:aarch64-darwin"
+
+# Apple's osfmk/mach tree as the MIG include root (same as liblaunch's MIG run).
+_MIG_BASE = "-novouchers -I$(location //:launchd_mig_mach_defs)"
+
+# Genrule inputs are package-relative. notify_old_ipc.defs includes
+# "notify_ipc.defs" from its own directory, so both inputs are declared.
+genrule(
+    name = "notify_mig",
+    srcs = ["notify_ipc.defs", "notify_old_ipc.defs", "//:launchd_mig_mach_defs"],
+    outs = {
+        "ipc_user": ["notify_ipcUser.c"],
+        "ipc_header": ["notify_ipc.h"],
+        "old_user": ["notify_old_ipcUser.c"],
+        "old_header": ["notify_old_ipc.h"],
+    },
+    cmd = "set -e\n" +
+          "MIG=$(exe //tools/migcom:mig)\n" +
+          "$MIG " + _MIG_BASE + " -target arm64-apple-macos27.0.0 -user $OUT/notify_ipcUser.c -header $OUT/notify_ipc.h -server /dev/null -sheader /dev/null notify_ipc.defs\n" +
+          "$MIG " + _MIG_BASE + " -target arm64-apple-macos27.0.0 -user $OUT/notify_old_ipcUser.c -header $OUT/notify_old_ipc.h -server /dev/null -sheader /dev/null notify_old_ipc.defs\n",
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)
+
+# DTrace provider header. The probe call sites are linked by mold (see
+# userspace/libmalloc/BUCK for the same arrangement).
+genrule(
+    name = "notify_probes",
+    srcs = ["notify_probes.d"],
+    out = "notify_probes.h",
+    cmd = "$(exe //tools/dtrace:dtrace) -h -s notify_probes.d -o $OUT",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "libnotify_objects",
+    srcs = [
+        "libnotify.c",
+        "notify_client.c",
+        "table.c",
+        ":notify_mig[ipc_user]",
+        ":notify_mig[old_user]",
+    ],
+    headers = {
+        "notify_ipc.h": ":notify_mig[ipc_header]",
+        "notify_old_ipc.h": ":notify_mig[old_header]",
+        "notify_probes.h": ":notify_probes",
+    },
+    header_namespace = "",
+    deps = [
+        "//:userspace_generated",
+        "//:system_framework_headers",
+        "//userspace:system_headers",
+        "//userspace/AvailabilityVersions:headers",
+        "//userspace/libc:libc_features",
+    ],
+    compiler_flags = [
+        "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+    ] + LIBC_BASE_FLAGS + LIBC_INCLUDE_FLAGS + [
+        "-Iuserspace/libc/include",
+        "-Ibsd",
+        "-Iosfmk",
+        "-Ilibkern",
+        "-Iuserspace/libnotify",
+        "-Iuserspace/launchd/liblaunch",
+    ],
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = _PLATFORM,
+    visibility = ["PUBLIC"],
+)

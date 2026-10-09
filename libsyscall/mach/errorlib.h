@@ -96,7 +96,7 @@ struct error_subsystem {
 	const struct error_sparse_map   *map_table;
 	int                             map_count;
 };
-#define errorlib_system_null    { NULL, 0, NULL, NULL, 0 }
+#define errorlib_sub_null       { .subsys_name = NULL, .max_code = 0, .codes = NULL, .map_table = NULL, .map_count = 0 }
 
 struct error_system {
 	int                             max_sub;
@@ -105,7 +105,7 @@ struct error_system {
 	const struct error_sparse_map   *map_table;
 	int                             map_count;
 };
-#define errorlib_sub_null       { 0, NULL, NULL, NULL, 0 }
+#define errorlib_system_null    { .max_sub = 0, .bad_sub = NULL, .subsystem = NULL, .map_table = NULL, .map_count = 0 }
 
 extern const struct error_system        _mach_errors[err_max_system + 1];
 char *mach_error_string_int(mach_error_t, boolean_t *);

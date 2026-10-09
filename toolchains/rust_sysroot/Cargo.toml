@@ -1,0 +1,13 @@
+# Throwaway crate whose only job is to make `-Zbuild-std` compile core,
+# alloc and compiler_builtins for the target (see toolchains/BUCK,
+# `rust_sysroot_arm64e`).
+[package]
+name = "sysroot_probe"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[profile.release]
+panic = "abort"

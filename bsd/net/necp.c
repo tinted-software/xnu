@@ -69,8 +69,7 @@
 #include <sys/file_internal.h>
 #include <IOKit/IOBSD.h>
 #include <libkern/crypto/rand.h>
-#include <corecrypto/cchmac.h>
-#include <corecrypto/ccsha2.h>
+#include <libkern/crypto/ccdigest_abi.h>
 #include <os/refcnt.h>
 #include <mach-o/loader.h>
 #include <net/network_agent.h>

@@ -1,5 +1,4 @@
-/build/
-/build_*/
+/buck-out
 .cache/
 .ruff_cache/
 .DS_Store
@@ -12,6 +11,9 @@ compile_commands.json
 target/
 .build/
 /external
-/subprojects/*
-!/subprojects/packagefiles
-!/subprojects/*.wrap
+rust-project.json
+compile_commands.json
+/out
+/subprojects/llvm-build
+/third-party/rust/.cargo
+/third-party/rust/vendor

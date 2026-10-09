@@ -34,12 +34,12 @@
 
 __BEGIN_DECLS
 
-#include <corecrypto/ccdigest.h>
-#include <corecrypto/cchmac.h>
-#include <corecrypto/ccmode.h>
-#include <corecrypto/ccrng.h>
-#include <corecrypto/ccrsa.h>
-#include <corecrypto/ccchacha20poly1305.h>
+#include <libkern/crypto/cc_abi.h>
+#include <libkern/crypto/ccdigest_abi.h>
+#include <libkern/crypto/ccmode_abi.h>
+#include <prng/ccrng_abi.h>
+#include <libkern/crypto/rsa_abi.h>
+#include <libkern/crypto/aead_abi.h>
 
 /* Function types */
 
@@ -110,15 +110,6 @@ typedef int (*ccrsa_verify_pkcs1v15_fn_t)(ccrsa_pub_ctx_t key, const uint8_t *oi
     size_t digest_len, const uint8_t *digest,
     size_t sig_len, const uint8_t *sig,
     bool *valid);
-
-__enum_decl(crypto_digest_alg_t, unsigned int, {
-	CRYPTO_DIGEST_ALG_NONE,
-	CRYPTO_DIGEST_ALG_MD5,
-	CRYPTO_DIGEST_ALG_SHA1,
-	CRYPTO_DIGEST_ALG_SHA256,
-	CRYPTO_DIGEST_ALG_SHA384,
-	CRYPTO_DIGEST_ALG_SHA512
-});
 
 typedef size_t (*crypto_digest_ctx_size_fn_t)(
 	crypto_digest_alg_t alg);

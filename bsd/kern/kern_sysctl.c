@@ -188,7 +188,7 @@
 #endif
 
 
-#include <corecrypto/ccsha2.h>
+#include <libkern/crypto/ccdigest_abi.h>
 
 /*
  * deliberately setting max requests to really high number

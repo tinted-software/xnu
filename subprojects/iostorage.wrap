@@ -1,6 +1,0 @@
-[wrap-git]
-url = https://github.com/apple-oss-distributions/IOStorageFamily.git
-revision = 7edb88fbae296fb7c8ce2f64e115e116e566d51c
-depth = 1
-directory = IOStorageFamily
-patch_directory = iostorage

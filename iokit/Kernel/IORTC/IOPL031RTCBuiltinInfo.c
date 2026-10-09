@@ -2,7 +2,9 @@
  * Builtin IOKit personalities for in-kernel drivers. One XML array, one
  * C string: KLDBootstrap::readBuiltinPersonalities() unserializes
  * __TEXT,__builtin_info as a single C string, so a second NUL-terminated
- * blob in the same section is never parsed.
+ * blob in the same section is never parsed. Entries carry no
+ * CFBundleIdentifier: that marks them as in-kernel drivers, which the
+ * catalogue never tries to load a kext for.
  *
  * This lives in __TEXT (a standard, always-mapped segment covered by
  * arm_vm_init.c's normal __TEXT_EXEC/__TEXT mapping) rather than a

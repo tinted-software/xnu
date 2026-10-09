@@ -1,0 +1,27 @@
+rust_binary(
+    name = "mig",
+    srcs = glob(["src/**/*.rs"]),
+    crate_root = "src/main.rs",
+    edition = "2021",
+    deps = [
+        "//third-party/rust:annotate-snippets",
+        "//third-party/rust:winnow",
+        "//third-party/rust:winnow-args",
+    ],
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+rust_binary(
+    name = "migcom",
+    srcs = glob(["src/**/*.rs"]),
+    crate_root = "src/migcom_bin.rs",
+    edition = "2021",
+    deps = [
+        "//third-party/rust:annotate-snippets",
+        "//third-party/rust:winnow",
+        "//third-party/rust:winnow-args",
+    ],
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)

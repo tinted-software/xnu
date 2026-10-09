@@ -48,9 +48,6 @@ pal_hib_globals_t gHibernateGlobals MARK_AS_HIBERNATE_DATA_CONST_LATE;
 // as a workaround for <rdar://problem/70121432> References between different compile units in xnu shouldn't go through GOT
 // all of the extern symbols that we refer to in this file have to be declared with hidden visibility
 extern IOHibernateImageHeader *gIOHibernateCurrentHeader __attribute__((visibility("hidden")));
-extern const uint32_t ccsha256_initial_state[8] __attribute__((visibility("hidden")));
-extern void AccelerateCrypto_SHA256_compress(ccdigest_state_t state, size_t numBlocks, const void *data) __attribute__((visibility("hidden")));
-extern void ccdigest_final_64be(const struct ccdigest_info *di, ccdigest_ctx_t, unsigned char *digest) __attribute__((visibility("hidden")));
 extern struct pmap_cpu_data_array_entry pmap_cpu_data_array[MAX_CPUS] __attribute__((visibility("hidden")));
 extern bool hib_entry_pmap_lockdown __attribute__((visibility("hidden")));
 

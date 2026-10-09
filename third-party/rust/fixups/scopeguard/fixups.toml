@@ -1,0 +1,5 @@
+# scopeguard 1.x is edition 2015, which reindeer's precise_srcs (reindeer.toml)
+# does not handle; it then falls back to globbing the crate while honoring
+# .gitignore, and /third-party/rust/vendor is ignored, so no srcs are emitted
+# and the prelude rejects the crate ("crate has no srcs"). List them here.
+extra_srcs = ["src/lib.rs"]

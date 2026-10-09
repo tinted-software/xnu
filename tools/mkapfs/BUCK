@@ -1,0 +1,55 @@
+# Host tool: packs a directory into a single-volume APFS container image.
+#   mkapfs --size <bytes> --label <name> -o out.img <dir>
+# The packing is done by the hadris-apfs writer; the library only scans the
+# host tree and wraps the output file. Split out so the round-trip test can
+# build into memory.
+
+rust_library(
+    name = "mkapfs-lib",
+    crate = "mkapfs_lib",
+    srcs = glob(
+        ["src/**/*.rs"],
+        exclude = ["src/main.rs"],
+    ),
+    crate_root = "src/lib.rs",
+    edition = "2021",
+    default_target_platform = "//platforms:host",
+    deps = [
+        "//third-party/rust:hadris-apfs",
+        "//third-party/rust:hadris-fs",
+        "//third-party/rust:hadris-io",
+        "//third-party/rust:hadris-storage",
+    ],
+    visibility = ["PUBLIC"],
+)
+
+rust_binary(
+    name = "mkapfs",
+    srcs = ["src/main.rs"],
+    crate_root = "src/main.rs",
+    edition = "2021",
+    deps = [":mkapfs-lib"],
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+# The repo has no Buck test toolchain, so the tests are libtest harness
+# binaries (`rustc --test`); run them with `buck2 run`.
+
+# Round trip through the hadris-apfs reader (the one the kernel uses).
+#   buck2 run //tools/mkapfs:mkapfs-roundtrip
+rust_binary(
+    name = "mkapfs-roundtrip",
+    srcs = ["tests/roundtrip.rs"],
+    crate_root = "tests/roundtrip.rs",
+    edition = "2021",
+    rustc_flags = ["--test"],
+    deps = [
+        ":mkapfs-lib",
+        "//third-party/rust:hadris-apfs",
+        "//third-party/rust:hadris-fs",
+        "//third-party/rust:hadris-storage",
+    ],
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)

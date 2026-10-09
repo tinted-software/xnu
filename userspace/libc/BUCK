@@ -1,0 +1,298 @@
+load(":sources.bzl", "LIBC_ARCHIVES", "LIBC_BASE_FLAGS", "LIBC_HEADERS", "LIBC_INCLUDE_FLAGS", "LIBC_PUBLIC_HEADER_INPUTS", "libc_sources")
+
+# macosx/arm64 normal, resolved from the upstream Xcode project and xcconfigs.
+# These are native archives, not a claimed libsystem_c.dylib runtime closure.
+# Normal arc4random.c requires the unavailable corecrypto/ccrng.h and corecrypto
+# runtime. Preserve that dependency rather than stub it or remove its consumer.
+# CrashReporterClient.h and dirhelper_priv.h are optional in the upstream code.
+
+genrule(
+    name = "libc_features",
+    srcs = [
+        "xcodescripts/generate_features.pl",
+        "Platforms/macosx/Makefile.inc",
+    ],
+    out = "libc_features",
+    cmd = "ARCHS=arm64 VARIANT_PLATFORM_NAME=macosx " +
+          "SRCROOT=\"$SRCDIR\" DERIVED_FILES_DIR=\"$OUT\" " +
+          "perl \"$SRCDIR/xcodescripts/generate_features.pl\"",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+# Xcode patches the installed private libc headers for the LIBC_ALIAS_* source
+# flags. Here those real public header inputs are available in the source tree.
+# The upstream patcher is used unchanged; no proprietary SDK is needed.
+genrule(
+    name = "variant_headers",
+    srcs = LIBC_PUBLIC_HEADER_INPUTS + ["xcodescripts/patch_headers_variants.pl"],
+    out = "variant_headers",
+    cmd = "mkdir -p \"$OUT\" && " +
+          "perl \"$SRCDIR/xcodescripts/patch_headers_variants.pl\" \"$SRCDIR/include\" \"$OUT\"",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "Platform",
+    srcs = libc_sources("Platform"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "Base",
+    srcs = libc_sources("Base"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "FreeBSD",
+    srcs = libc_sources("FreeBSD"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "NetBSD",
+    srcs = libc_sources("NetBSD"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "TRE",
+    srcs = libc_sources("TRE"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "vCancelable",
+    srcs = libc_sources("vCancelable"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "vDarwinExtsn",
+    srcs = libc_sources("vDarwinExtsn"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "vDarwinExtsnCancelable",
+    srcs = libc_sources("vDarwinExtsnCancelable"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "vPre1050",
+    srcs = libc_sources("vPre1050"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "vLegacy",
+    srcs = libc_sources("vLegacy"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "vInode32",
+    srcs = libc_sources("vInode32"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "FortifySource",
+    srcs = libc_sources("FortifySource"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    # Same environment as libsystem_c_objects (Availability chain, generated headers).
+    compiler_flags = ["-include", "EXTERNAL_HEADERS/xros_availability_aliases.h"],
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+        "cxx": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    deps = [
+        "//userspace/AvailabilityVersions:headers",
+        "//:userspace_generated",
+    ],
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# A real native combined archive of exactly normal.linklist's 12 archives in
+# BUILD_ARCHIVES order, with the same per-source and per-variant flags. Buck's
+# CxxSrcWithFlags indexes repeated paths with distinct flag sets, retaining
+# each symbol-versioned compilation. No runtime libraries are silently linked.
+cxx_library(
+    name = "libsystem_c_objects",
+    srcs = [source for archive in LIBC_ARCHIVES for source in libc_sources(archive)],
+    raw_headers = LIBC_HEADERS,
+    compiler_flags = [
+        "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+    ],
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+        "cxx": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    deps = [
+        "//userspace/AvailabilityVersions:headers",
+        "//:userspace_generated",
+        # arc4random's entropy source (corecrypto is not published).
+        "//userspace/libc/ccrng:ccrng",
+    ],
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# libc_dyld is a different upstream archive, not the normal system libc.
+cxx_library(
+    name = "libc_dyld",
+    srcs = libc_sources("libc_dyld"),
+    raw_headers = LIBC_HEADERS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# Reproduce build_linklists.sh's normal selection and symbol classification.
+# llvm-nm's long options avoid Darwin nm's incompatible -f option semantics.
+genrule(
+    name = "link_lists",
+    srcs = [":" + archive + "[static-pic]" for archive in LIBC_ARCHIVES],
+    out = "link_lists",
+    cmd = "set -e\nmkdir -p \"$OUT\"\n" +
+          "printf '%s\\n' " + " ".join(["\"$(location :" + archive + "[static-pic])\"" for archive in LIBC_ARCHIVES]) + " > \"$OUT/normal.linklist\"\n" +
+          "llvm-nm --print-file-name --defined-only --extern-only --format=darwin --no-sort " +
+          " ".join(["\"$(location :" + archive + "[static-pic])\"" for archive in LIBC_ARCHIVES]) +
+          " > \"$OUT/symbols\"\n" +
+          "awk '/__TEXT,__text/ && !/\\$VARIANT/ { print $NF }' \"$OUT/symbols\" > \"$OUT/interposable.list\"\n" +
+          "awk '/\\$VARIANT/ { print $NF }' \"$OUT/symbols\" > \"$OUT/unexport.list\"\n" +
+          "rm \"$OUT/symbols\"\n",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "alias_list",
+    src = "xcodescripts/alias.list",
+    visibility = ["PUBLIC"],
+)
+
+# The userspace libsystem_trace is unpublished, so libc's crash path has no
+# provider for <os/log_private.h> or for the two entry points it calls
+# (os_log_send_and_compose, os_log_pack_send_and_compose). This target supplies
+# both; os/log_private.h documents the fidelity limits (no log transport, pack
+# argument metadata not reproduced). libsystem_c's shared target must link this
+# in place of the unavailable system_trace dependency.
+cxx_library(
+    name = "libsystem_trace_compat",
+    srcs = ["os/os_log_pack.c"],
+    raw_headers = ["os/log_private.h"],
+    # LIBC_INCLUDE_FLAGS puts -Iuserspace/libc ahead of -Ilibkern, so
+    # <os/log_private.h> resolves to the userspace provider above.
+    # -Iuserspace/libc/include is what libc_sources adds for non-variant
+    # archives; LIBC_INCLUDE_FLAGS is the shared remainder.
+    compiler_flags = ["-include", "EXTERNAL_HEADERS/xros_availability_aliases.h"] + LIBC_BASE_FLAGS + ["-Iuserspace/libc/include"] + LIBC_INCLUDE_FLAGS,
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+        "cxx": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    deps = [
+        "//userspace/AvailabilityVersions:headers",
+        "//:userspace_generated",
+    ],
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# Opt-in linker contract for the eventual real shared target. Do not put dylib
+# symbol policy on static archive clients (in particular dyld's libc_dyld).
+# The complete libc.xcconfig runtime dependency set is CrashReporterClient,
+# compiler_rt, dyld, system_kernel, system_m, system_malloc, system_platform,
+# system_pthread; upward: dispatch, macho, system_asl, system_blocks,
+# system_info, system_notify, xpc, corecrypto, system_trace. A libsystem_c
+# shared target is intentionally not advertised until that closure is real.
+cxx_library(
+    name = "libsystem_c_link_options",
+    exported_linker_flags = [
+        "-nostdlib",
+        "-Wl,-umbrella,System",
+        "-Wl,-install_name,/usr/lib/system/libsystem_c.dylib",
+        "-Wl,-interposable_list,$(location :link_lists)/interposable.list",
+        "-Wl,-unexported_symbols_list,$(location :link_lists)/unexport.list",
+        "-Wl,-alias_list,$(location :alias_list)",
+    ],
+    preferred_linkage = "static",
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# Installed as <System/atexit.h> (dyld includes it for __cxa_finalize_ranges).
+export_file(
+    name = "atexit_header",
+    src = "stdlib/FreeBSD/atexit.h",
+    visibility = ["PUBLIC"],
+)

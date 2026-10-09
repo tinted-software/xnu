@@ -1,5 +1,0 @@
-[wrap-git]
-url = https://github.com/llvm/llvm-project.git
-revision = 084cb22437448bc53228f7f03dc20749dabe96a6
-depth = 1
-patch_directory = llvm-project

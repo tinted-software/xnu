@@ -1,0 +1,50 @@
+load("//xnu:subproject_defs.bzl", "subproject_library_args")
+
+_LLVM_REV = "392dfff97d29b59d77e5cac6d4b6ef2585fe7117"
+
+http_archive(
+    name = "llvm-project",
+    urls = ["https://github.com/llvm/llvm-project/archive/{}.tar.gz".format(_LLVM_REV)],
+    sha256 = "d6dd769a5c981bc0ec5d877e55ca141e826aca1bca5c5e7d6128e70341dd3ae0",
+    strip_prefix = "llvm-project-" + _LLVM_REV,
+    sub_targets = [
+        "compiler-rt/lib/profile/InstrProfiling.c",
+        "compiler-rt/lib/profile/InstrProfilingInternal.c",
+        "compiler-rt/lib/profile/InstrProfilingPlatformDarwin.c",
+        "compiler-rt/lib/profile/InstrProfilingBuffer.c",
+        "compiler-rt/lib/profile/InstrProfilingWriter.c",
+        "compiler-rt/lib/profile/InstrProfilingNameVar.c",
+        "compiler-rt/lib/profile/InstrProfilingVersionVar.c",
+        "libcxx/vendor/llvm/default_assertion_handler.in",
+        "libcxx/src/functional.cpp",
+    ],
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(**subproject_library_args(
+    name = "xnu_compiler_rt",
+    subproject = "compiler_rt",
+    lang = "c",
+    extra_includes = [
+        "-I$(location :llvm-project)/compiler-rt/lib/profile",
+        "-I$(location :llvm-project)/compiler-rt/include",
+        "-Ilibkern",
+    ],
+    extra_defines = [
+        "-DCOMPILER_RT_PROFILE_BAREMETAL=1",
+        "-DCOMPILER_RT_HAS_ATOMICS=1",
+        "-Wno-error",
+    ],
+))
+
+alias(
+    name = "libcxx_default_assertion_handler",
+    actual = ":llvm-project[libcxx/vendor/llvm/default_assertion_handler.in]",
+    visibility = ["PUBLIC"],
+)
+
+alias(
+    name = "libcxx_functional_src",
+    actual = ":llvm-project[libcxx/src/functional.cpp]",
+    visibility = ["PUBLIC"],
+)

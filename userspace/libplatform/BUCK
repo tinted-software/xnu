@@ -1,0 +1,3 @@
+load(":libplatform.bzl", "libplatform_libraries")
+
+libplatform_libraries()

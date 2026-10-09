@@ -1,0 +1,19 @@
+rust_binary(
+    name = "qemu-boot.elf",
+    crate = "qemu_boot",
+    srcs = glob([
+        "src/**/*.rs",
+        "linker.ld",
+    ]),
+    crate_root = "src/main.rs",
+    edition = "2021",
+    rustc_flags = [
+        "-C",
+        "link-arg=-Ttools/qemu-boot/linker.ld",
+    ],
+    deps = [
+        "//third-party/rust:object",
+    ],
+    default_target_platform = "//platforms:aarch64-none",
+    visibility = ["PUBLIC"],
+)

@@ -1,0 +1,30 @@
+# libm objects for libsystem_m. Only the architecture-neutral C99 classification
+# sources (__fpclassify / __fpclassifyf) are built here. The arm64 fenv
+# implementation (fegetenv/fesetenv/fegetround/...) is NOT in the tree nor in
+# upstream apple-oss-distributions/Libm, so it is intentionally absent.
+
+load("//userspace/libc:sources.bzl", "LIBC_BASE_FLAGS", "LIBC_INCLUDE_FLAGS")
+
+cxx_library(
+    name = "libm_objects",
+    srcs = [
+        "Source/ARM/fpclassify.c",
+        "Source/ARM/fpclassifyf.c",
+    ],
+    compiler_flags = ["-include", "EXTERNAL_HEADERS/xros_availability_aliases.h"] +
+        LIBC_BASE_FLAGS +
+        ["-Iuserspace/libm/Source/ARM"] +
+        LIBC_INCLUDE_FLAGS,
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    deps = [
+        "//userspace/AvailabilityVersions:headers",
+        "//:userspace_generated",
+    ],
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

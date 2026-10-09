@@ -1,0 +1,31 @@
+load("//xnu:subproject_defs.bzl", "subproject_library_args")
+
+cxx_library(**subproject_library_args(
+    name = "xnu_msdosfs",
+    subproject = "msdosfs",
+    lang = "c",
+    local = True,
+    extra_includes = [
+        "-Isubprojects/msdosfs/msdosfs.kextproj/msdosfs.kmodproj",
+        "-Isubprojects/msdosfs",
+    ],
+    extra_defines = [
+        "-DDRIVER_PRIVATE",
+        "-D_KERNEL_BUILD",
+        "-DKERNEL_BUILD",
+        "-DMACH_KERNEL",
+        "-DBSD_BUILD",
+        "-DBSD_KERNEL_PRIVATE",
+        "-DABSOLUTETIME_SCALAR_TYPE",
+        "-DNEEDS_SCHED_CALL_T",
+        "-D__PTHREAD_EXPOSE_INTERNALS__",
+        "-DPTHREAD_INTERNAL",
+        "-Dpthread_kern=pthread_kext_kern",
+        "-Dcurrent_uthread=pthread_kext_current_uthread",
+        "-Wno-int-conversion",
+        "-include", "$(location //subprojects/libpthread:pthread_kext_compat_h)",
+        "-DMSDOSFS_AUTO_UNLOAD=0",
+        "-DDEBUG=0",
+        "-Wno-implicit-function-declaration",
+    ],
+))

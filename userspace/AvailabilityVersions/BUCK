@@ -1,0 +1,36 @@
+_HEADER_DESTINATIONS = {
+    "Availability.h": "Availability.h",
+    "AvailabilityInternal.h": "AvailabilityInternal.h",
+    "AvailabilityInternalLegacy.h": "AvailabilityInternalLegacy.h",
+    "AvailabilityInternalPrivate.h": "AvailabilityInternalPrivate.h",
+    "AvailabilityMacros.h": "AvailabilityMacros.h",
+    "AvailabilityProhibitedInternal.h": "AvailabilityProhibitedInternal.h",
+    "AvailabilityVersions.h": "AvailabilityVersions.h",
+    "os_availability.h": "os/availability.h",
+    # dyld's mach-o/dyld_priv.h conditionally includes this.
+    "dyld_version_defines.h": "mach-o/dyld_version_defines.h",
+    "VersionMap.h": "dyld/VersionMap.h",
+}
+
+native.genrule(
+    name = "headers",
+    srcs = ["availability", "availability.dsl", "port_additions.dsl"] + [
+        "templates/" + source
+        for source in _HEADER_DESTINATIONS
+    ],
+    out = "include",
+    # The generator reads availability.dsl from next to sys.argv[0], so the
+    # vendored script and DSL are copied into $TMP and the port additions are
+    # appended there; the vendored files stay as published.
+    cmd = "set -e\n" +
+          "mkdir -p \"$OUT/os\" \"$OUT/mach-o\" \"$OUT/dyld\" \"$TMP/gen\"\n" +
+          "cp \"$SRCDIR/availability\" \"$TMP/gen/availability\"\n" +
+          "cat \"$SRCDIR/availability.dsl\" \"$SRCDIR/port_additions.dsl\" > \"$TMP/gen/availability.dsl\"\n" +
+          " && ".join([
+        "python3 \"$TMP/gen/availability\" --preprocess " +
+        "\"$SRCDIR/templates/" + source + "\" \"$OUT/" + destination + "\""
+        for source, destination in _HEADER_DESTINATIONS.items()
+    ]),
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

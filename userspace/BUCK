@@ -1,0 +1,128 @@
+load("//userspace/libc:sources.bzl", "LIBC_BASE_FLAGS", "LIBC_INCLUDE_FLAGS")
+load(":system.bzl", "system_libraries")
+load("//xnu:kernel.bzl", "target_triple")
+
+system_libraries()
+
+# liblaunch's bootstrap.h is installed as <servers/bootstrap.h>. The userspace
+# generated header tree (root package) installs it from here.
+export_file(
+    name = "liblaunch_bootstrap",
+    src = "launchd/liblaunch/bootstrap.h",
+    visibility = ["PUBLIC"],
+)
+
+# liblaunch's MIG clients (job.defs, helper.defs), run with the repo's mig driver.
+# `import "x"` is emitted by migcom as `#include x` (its parser drops the quotes),
+# so the copies handed to mig use the equivalent `import <x>` form, resolved via
+# the same -I path (launchd/liblaunch). Only the copies are rewritten. Apple's
+# osfmk/mach defs come from the root target //:launchd_mig_mach_defs.
+genrule(
+    name = "liblaunch_mig",
+    srcs = glob(["launchd/src/*.defs", "launchd/liblaunch/*.h", "launchd/src/*.h"]) + [
+        "//:launchd_mig_mach_defs",
+    ],
+    outs = {
+        "all": [
+            "include/job.h",
+            "include/helper.h",
+            "include/helperServer.h",
+            "users/jobUser.c",
+            "users/helperUser.c",
+            "users/helperServer.c",
+        ],
+        "headers": [
+            "include/job.h",
+            "include/helper.h",
+            "include/helperServer.h",
+        ],
+        "users": [
+            "users/jobUser.c",
+            "users/helperUser.c",
+            "users/helperServer.c",
+        ],
+    },
+    cmd = r"""set -e
+MIG=$(exe //tools/migcom:mig)
+mkdir -p $OUT/include $OUT/users $TMP/defs
+cp launchd/src/*.defs $TMP/defs/
+sed -i -E 's/^(\w*import) "([^"]*)"/\1 <\2>/' $TMP/defs/*.defs
+BASE="-I$TMP -Ilaunchd/liblaunch -I$(location //:launchd_mig_mach_defs)"
+$MIG $BASE -target arm64-apple-macos27.0.0 -user $OUT/users/jobUser.c -header $OUT/include/job.h -server /dev/null -sheader /dev/null $TMP/defs/job.defs
+$MIG $BASE -target arm64-apple-macos27.0.0 -user $OUT/users/helperUser.c -header $OUT/include/helper.h -server $OUT/users/helperServer.c -sheader $OUT/include/helperServer.h $TMP/defs/helper.defs
+""",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+# liblaunch (client side): libbootstrap.c, libvproc.c, liblaunch.c. The server
+# half of helper.defs is linked because libvproc.c includes helperServer.h.
+cxx_library(
+    name = "liblaunch_objects",
+    srcs = [
+        "launchd/liblaunch/libbootstrap.c",
+        "launchd/liblaunch/libvproc.c",
+        "launchd/liblaunch/liblaunch.c",
+        ":liblaunch_mig[users]",
+    ],
+    raw_headers = glob(["launchd/liblaunch/*.h", "launchd/src/*.h"]),
+    compiler_flags = [
+        "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+    ] + LIBC_BASE_FLAGS + [
+        # libc's per-archive order: userspace/libc/include (time.h, _types.h, string.h)
+        # precedes the shared LIBC_INCLUDE_FLAGS, as in sources.bzl libc_sources().
+        "-Iuserspace/libc/include",
+        # liblaunch.xcconfig: MIG type checking, private-extern MIG stubs,
+        # and GCC_SYMBOLS_PRIVATE_EXTERN (hidden by default; the public API
+        # opts in via #pragma GCC visibility push(default) in its headers).
+        "-DXPC_BUILDING_LAUNCHD=1",
+        "-D__MigTypeCheck=1",
+        "-Dmig_external=__private_extern__",
+        "-D_DARWIN_USE_64_BIT_INODE=1",
+        "-fvisibility=hidden",
+        "-Iuserspace/launchd/liblaunch",
+        "-Iuserspace/launchd/src",
+        "-I$(location :liblaunch_mig)/include",
+    ] + LIBC_INCLUDE_FLAGS,
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    deps = [
+        ":liblaunch_mig",
+        ":system_headers",
+        "//:userspace_generated",
+        "//:system_framework_headers",
+        "//userspace/AvailabilityVersions:headers",
+        "//userspace/libc:libc_features",
+    ],
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# /Library/Filesystems/apfs.fs/Contents/Resources/mount_apfs: the mount helper
+# for the kernel's read-only apfs root (see mount_apfs/mount_apfs.c). It makes
+# its system calls directly; the libSystem stub only provides the load command
+# dyld requires of every executable.
+export_file(
+    name = "mount_apfs_libsystem_stub",
+    src = "mount_apfs/libSystem.tbd",
+)
+
+cxx_binary(
+    name = "mount_apfs",
+    srcs = ["mount_apfs/mount_apfs.c"],
+    compiler_flags = [
+        "-target", target_triple(),
+        "-ffreestanding", "-fno-builtin", "-fno-stack-protector", "-Os",
+    ],
+    linker_flags = [
+        "-nostdlib",
+        "-Wl,-e,_main",
+        "$(location :mount_apfs_libsystem_stub)",
+    ],
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

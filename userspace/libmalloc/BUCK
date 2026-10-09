@@ -1,0 +1,155 @@
+load(":sources.bzl", "MALLOC_NORMAL_SRCS", "MALLOC_RESOLVED_SRCS")
+load("//xnu:kernel.bzl", "target_triple")
+
+cxx_library(
+    name = "headers",
+    header_namespace = "",
+    exported_headers = {
+        "malloc/_malloc.h": "include/malloc/_malloc.h",
+        "malloc/_malloc_type.h": "include/malloc/_malloc_type.h",
+        "malloc/_platform.h": "include/malloc/_platform.h",
+        "malloc/_ptrcheck.h": "include/malloc/_ptrcheck.h",
+        "malloc/malloc.h": "include/malloc/malloc.h",
+        "malloc_implementation.h": "private/malloc_implementation.h",
+        "malloc_private.h": "private/malloc_private.h",
+        "malloc_private.modulemap": "private/malloc_private.modulemap",
+        "malloc_type_private.h": "private/malloc_type_private.h",
+        "stack_logging.h": "private/stack_logging.h",
+    },
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# DTrace provider-header generation. //tools/dtrace is the host replacement for
+# Apple's `dtrace -h` (upstream: lib/libdtrace/common/dt_program.c). The link
+# step that `dtrace -G` performs (turning probe call sites into nops and emitting
+# the DOF section) is done by the linker: mold (macho/dtrace.rs) consumes the
+# undefined ___dtrace_probe$/___dtrace_isenabled$ symbols this header references.
+genrule(
+    name = "magmalloc_provider",
+    srcs = ["src/magmallocProvider.d"],
+    out = "magmallocProvider.h",
+    cmd = "$(exe //tools/dtrace:dtrace) -h -s src/magmallocProvider.d -o $OUT",
+    default_target_platform = "//platforms:host",
+    visibility = ["PUBLIC"],
+)
+
+# libmalloc_resolved.xcconfig excludes every source of these archives. In the
+# normal macOS composition they are empty, just as upstream; compiling their
+# unfiltered source phases would duplicate malloc and magazine implementations.
+cxx_library(
+    name = "libmalloc_mp",
+    srcs = MALLOC_RESOLVED_SRCS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "libmalloc_alt",
+    srcs = MALLOC_RESOLVED_SRCS,
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# This is the complete normal allocator object archive, not a dylib with a
+# fabricated runtime closure. The upward/shared dependencies still required for
+# a libsystem_malloc.dylib are documented in sources.bzl (and libmalloc.xcconfig).
+# Retain normal-variant LTO and internal Darwin alias/atomic definitions.
+cxx_library(
+    name = "libsystem_malloc_objects",
+    srcs = MALLOC_NORMAL_SRCS,
+    headers = dict(
+        [(path, path) for path in glob(["src/**/*.h", "resolver/*.h"])] +
+        [
+            ("resolver.h", "resolver/resolver.h"),
+            ("resolver_internal.h", "resolver/resolver_internal.h"),
+            ("magmallocProvider.h", ":magmalloc_provider"),
+        ],
+    ),
+    header_namespace = "",
+    exported_deps = [":headers"],
+    deps = [
+        ":libmalloc_mp",
+        ":libmalloc_alt",
+        "//:userspace_generated",
+        "//userspace/libc:libc_features",
+        "//userspace:system_headers",
+        "//userspace/libplatform:headers",
+        "//userspace/AvailabilityVersions:headers",
+        "//userspace/featureflags:headers",
+        "//userspace/corecrypto_compat:ccsha2",
+    ],
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    compiler_flags = [
+        "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+        "-target", target_triple(),
+        "-nostdlibinc",
+        "-std=gnu11",
+        "-O2",
+        "-flto",
+        "-fblocks",
+        "-fno-common",
+        "-fstack-protector",
+        # -fno-typed-memory-operations (Apple clang's libmalloc flag) is not
+        # defined by the in-tree LLVM: the feature does not exist there, so
+        # there is nothing to disable.
+        "-momit-leaf-frame-pointer",
+        "-Werror=implicit-function-declaration",
+        "-DPRIVATE",
+        "-D__APPLE_API_PRIVATE",
+        "-D__DARWIN_ONLY_VERS_1050=1",
+        "-D__DARWIN_ONLY_UNIX_CONFORMANCE=1",
+        "-D__DARWIN_ONLY_64_BIT_INO_T=1",
+        "-D_LIBC_NO_FEATURE_VERIFICATION=1",
+        "-DOS_ATOMIC_CONFIG_MEMORY_ORDER_DEPENDENCY=1",
+        "-DOSATOMIC_USE_INLINED=1",
+        "-DOS_UNFAIR_LOCK_INLINE=1",
+        "-D_FORTIFY_SOURCE=0",
+        "-DNDEBUG",
+        "-DTARGET_OS_EXCLAVECORE=0",
+        "-DTARGET_OS_EXCLAVEKIT=0",
+        "-I$(location //userspace/featureflags:headers)",
+        "-Iuserspace/corecrypto_compat/include",
+        "-I$(location //userspace/AvailabilityVersions:headers)",
+        "-I$(location //:userspace_generated)/include",
+        "-I$(location //userspace/libc:libc_features)/arm64",
+        "-I$(location //userspace:system_headers)",
+        "-Iuserspace/libmalloc/src",
+        "-Iuserspace/libc/include",
+        "-Iuserspace/libc/gen",
+        "-Iuserspace/libplatform/include",
+        "-Iuserspace/libplatform/private",
+        "-Isubprojects/libpthread/include",
+        "-Isubprojects/libpthread/private",
+        "-Iuserspace/dyld/include",
+        "-Ilibsyscall",
+        "-Ilibsyscall/mach",
+        "-IEXTERNAL_HEADERS",
+        "-Iosfmk",
+        "-Ilibsyscall/wrappers",
+        "-Ibsd",
+        "-Ilibkern",
+        "-Iiokit",
+        "-Ipexpert",
+    ],
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# Required by the eventual shared link: -interposable_list from the original
+# libmalloc.xcconfig. Export the exact list for that consumer, without silently
+# applying dylib-only flags to the object archive.
+export_file(
+    name = "interposable_list",
+    src = "xcodeconfig/interposable.list",
+    visibility = ["PUBLIC"],
+)

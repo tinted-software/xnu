@@ -27,6 +27,7 @@
  */
 
 #include <IOKit/IORPC.h>
+#include <mach/notify.h>
 #include <IOKit/IOKitServer.h>
 #include <IOKit/IOKitKeysPrivate.h>
 #include <IOKit/IOKernelReportStructs.h>

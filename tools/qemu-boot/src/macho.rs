@@ -62,8 +62,10 @@ pub unsafe fn load_macho_image(
         magic, filetype, ncmds
     );
 
-    if (magic != macho::MH_MAGIC_64 && magic != macho::MH_CIGAM_64) || filetype != macho::MH_EXECUTE
-    {
+    // A kernelcache is an MH_FILESET: its outer header lists every segment of
+    // the collection and the entry point, so it loads like the bare kernel did.
+    let loadable = filetype == macho::MH_EXECUTE || filetype == macho::MH_FILESET;
+    if (magic != macho::MH_MAGIC_64 && magic != macho::MH_CIGAM_64) || !loadable {
         return Err("invalid mach-o magic or file type");
     }
 

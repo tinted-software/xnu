@@ -41,8 +41,7 @@
 #include <sys/types.h>
 
 #ifdef BSD_KERNEL_PRIVATE
-#include <corecrypto/cchmac.h>
-#include <corecrypto/ccsha2.h>
+#include <libkern/crypto/ccdigest_abi.h>
 #endif /* BSD_KERNEL_PRIVATE */
 
 struct ah {

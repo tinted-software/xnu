@@ -62,8 +62,7 @@
 
 #include "tcp_includes.h"
 
-#include <corecrypto/cchmac.h>
-#include <corecrypto/ccsha2.h>
+#include <libkern/crypto/ccdigest_abi.h>
 #include <net/if_var_private.h>
 #include <netinet/in_tclass.h>
 #include <netinet/ip.h>

@@ -27,6 +27,7 @@
  */
 
 #include <kern/locks.h>
+#include <kern/startup.h>
 #include <kern/cpu_number.h>
 #include <libkern/section_keywords.h>
 #include <libkern/crypto/sha2.h>
@@ -36,12 +37,10 @@
 #include <sys/random.h>
 #include <prng/random.h>
 #include <prng/entropy.h>
-#include <corecrypto/ccdigest.h>
-#include <corecrypto/ccdigest_priv.h>
-#include <corecrypto/ccdrbg.h>
-#include <corecrypto/cckprng.h>
-#include <corecrypto/ccsha2.h>
-#include <corecrypto/cchmac.h>
+#include <libkern/crypto/cc_abi.h>
+#include <libkern/crypto/ccdigest_abi.h>
+#include <prng/ccrng_abi.h>
+#include "hmac_drbg.h"
 
 static struct cckprng_ctx *prng_ctx;
 
@@ -95,7 +94,7 @@ bootseed_init_native(uint32_t request_size, uint8_t *dst)
 		while (i < n) {
 			asm volatile ("rdseed %0; setc %1" : "=r"(x), "=qm"(ok) : : "cc");
 			if (ok) {
-				cc_memcpy(&dst[i * sizeof(x)], &x, sizeof(x));
+				memcpy(&dst[i * sizeof(x)], &x, sizeof(x));
 				i += 1;
 			} else {
 				// Intel recommends to pause between unsuccessful rdseed attempts.
@@ -110,7 +109,7 @@ bootseed_init_native(uint32_t request_size, uint8_t *dst)
 			asm volatile ("rdrand %0; setc %1" : "=r"(x), "=qm"(ok) : : "cc");
 			if (ok) {
 				if (i % 512 == 0) {
-					cc_memcpy(&dst[(i / 512) * sizeof(x)], &x, sizeof(x));
+					memcpy(&dst[(i / 512) * sizeof(x)], &x, sizeof(x));
 				}
 				i += 1;
 			} else {
@@ -127,8 +126,7 @@ bootseed_init_native(uint32_t request_size, uint8_t *dst)
 static void
 bootseed_init_native(uint32_t request_size, uint8_t *dst)
 {
-	// Even if we don't have any input, the second input needs to be a fixed input of the same size
-	// to maintain dual-PRF security for HKDF/HMAC. All zero is fine as long as it is fixed.
+	/* Hardware entropy is optional; never treat uninitialized memory as input. */
 	cc_clear(request_size, dst);
 }
 
@@ -156,74 +154,59 @@ bootseed_init(void)
 	memcpy(kprngseed, bootloader_rand, SEED_SIZE);
 	cc_clear(SEED_SIZE, bootloader_rand);
 
-	uint8_t native_rand[3 * SEED_SIZE];
+	uint8_t native_rand[3 * SEED_SIZE] = {0};
 	bootseed_init_native(sizeof(native_rand), native_rand);
 
-	const struct ccdigest_info *di = &ccsha512_ltc_di;
+	const struct ccdigest_info *di = ccsha512_di();
 	assert3u(SEED_SIZE, <, di->block_size);
 
-	uint8_t zero_salt[SEED_SIZE] = {0};
-	uint8_t combined_input[2 * SEED_SIZE];
+	/* Domain-separated extraction must retain bootloader entropy even on
+	 * x86 machines with neither RDSEED nor RDRAND and only a 64-byte packet. */
+	uint8_t combined_input[1 + 2 * SEED_SIZE];
 
-	// First subkey: bootloader_rand[64-127] || native_rand[0-63]
-	memcpy(combined_input, &bootloader_rand[1 * SEED_SIZE], SEED_SIZE);
-	memcpy(&combined_input[SEED_SIZE], &native_rand[0 * SEED_SIZE], SEED_SIZE);
-	cchmac(di, SEED_SIZE, zero_salt, 2 * SEED_SIZE, combined_input, earlyseed);
+	combined_input[0] = 1;
+	memcpy(&combined_input[1], &bootloader_rand[1 * SEED_SIZE], SEED_SIZE);
+	memcpy(&combined_input[1 + SEED_SIZE], &native_rand[0 * SEED_SIZE], SEED_SIZE);
+	cchmac(di, SEED_SIZE, kprngseed, sizeof(combined_input), combined_input, earlyseed);
 
-	// Second subkey: bootloader_rand[128-191] || native_rand[64-127]
-	memcpy(combined_input, &bootloader_rand[2 * SEED_SIZE], SEED_SIZE);
-	memcpy(&combined_input[SEED_SIZE], &native_rand[1 * SEED_SIZE], SEED_SIZE);
-	cchmac(di, SEED_SIZE, zero_salt, 2 * SEED_SIZE, combined_input, entropyseed);
+	combined_input[0] = 2;
+	memcpy(&combined_input[1], &bootloader_rand[2 * SEED_SIZE], SEED_SIZE);
+	memcpy(&combined_input[1 + SEED_SIZE], &native_rand[1 * SEED_SIZE], SEED_SIZE);
+	cchmac(di, SEED_SIZE, kprngseed, sizeof(combined_input), combined_input, entropyseed);
 
-	// Third subkey: bootloader_rand[192-255] || native_rand[128-191]
-	memcpy(combined_input, &bootloader_rand[3 * SEED_SIZE], SEED_SIZE);
-	memcpy(&combined_input[SEED_SIZE], &native_rand[2 * SEED_SIZE], SEED_SIZE);
-	cchmac(di, SEED_SIZE, zero_salt, 2 * SEED_SIZE, combined_input, kprng_reseed);
+	combined_input[0] = 3;
+	memcpy(&combined_input[1], &bootloader_rand[3 * SEED_SIZE], SEED_SIZE);
+	memcpy(&combined_input[1 + SEED_SIZE], &native_rand[2 * SEED_SIZE], SEED_SIZE);
+	cchmac(di, SEED_SIZE, kprngseed, sizeof(combined_input), combined_input, kprng_reseed);
 
 	cc_clear(sizeof(combined_input), combined_input);
 
-	cc_clear(BOOTLOADER_ENTROPY_REQUEST_SIZE, bootloader_rand);
-	cc_clear(BOOTLOADER_ENTROPY_REQUEST_SIZE, native_rand);
+	cc_clear(sizeof(bootloader_rand), bootloader_rand);
+	cc_clear(sizeof(native_rand), native_rand);
 }
 
-#define EARLY_RANDOM_STATE_STATIC_SIZE (264)
-
 static struct {
-	uint8_t drbg_state[EARLY_RANDOM_STATE_STATIC_SIZE];
-	struct ccdrbg_info drbg_info;
-	const struct ccdrbg_nisthmac_custom drbg_custom;
-} erandom = {.drbg_custom = {
-		     .di         = &ccsha256_ltc_di,
-		     .strictFIPS = 0,
-	     }};
+	struct hmac_drbg_sha256 drbg;
+} erandom;
+static int erandom_initialized;
 
 __attribute__((noinline))
 static void
 early_random_init(void)
 {
 	uint64_t nonce;
-	int rc;
 	const char ps[] = "xnu early random";
 
 	bootseed_init();
 
-	/* Init DRBG for NIST HMAC */
-	ccdrbg_factory_nisthmac(&erandom.drbg_info, &erandom.drbg_custom);
-	assert3u(erandom.drbg_info.size, <=, sizeof(erandom.drbg_state));
-
-	/*
-	 * Init our DBRG from the boot entropy and a timestamp as nonce
-	 * and the cpu number as personalization.
-	 */
+	/* The timestamp diversifies the state; entropy comes from bootseed_init. */
 	assert3u(sizeof(earlyseed), >, sizeof(nonce));
 	nonce = ml_get_timebase();
-	rc = ccdrbg_init(&erandom.drbg_info, (struct ccdrbg_state *)erandom.drbg_state, sizeof(earlyseed), earlyseed, sizeof(nonce), &nonce, sizeof(ps) - 1, ps);
-	if (rc != CCDRBG_STATUS_OK) {
-		panic("ccdrbg_init() returned %d", rc);
-	}
+	hmac_drbg_sha256_instantiate(&erandom.drbg, earlyseed, sizeof(earlyseed), &nonce, sizeof(nonce), ps, sizeof(ps) - 1);
 
 	cc_clear(sizeof(nonce), &nonce);
 	cc_clear(sizeof(earlyseed), earlyseed);
+	erandom_initialized = 1;
 }
 
 __static_testable void read_erandom(void * buf, size_t nbytes);
@@ -238,41 +221,15 @@ __static_testable void read_erandom(void * buf, size_t nbytes);
  * quality of the seed. It is seeded (lazily) with entropy provided by
  * the Booter.
  *
- * The implementation is a NIST HMAC-SHA256 DRBG instance used as
- * follows:
- *
- *  - When first called (on macOS this is very early while page tables
- *    are being built) early_random() calls ccdrbg_factory_hmac() to
- *    set-up a ccdbrg info structure.
- *
- *  - A 64-byte seed from the bootloader is hashed with HMAC-SHA512.
- *    Where available, hardware RNG outputs are mixed into the seed.
- *    (See bootseed_init.) The resulting seed is 64 bytes.
- *
- *  - The ccdrbg state structure is a statically allocated area which
- *    is then initialized by calling the ccdbrg_init method. The
- *    initial entropy is the 64-byte seed described above. The nonce
- *    is an 8-byte timestamp from ml_get_timebase(). The
- *    personalization data provided is a fixed string.
- *
- *  - 64-bit outputs are generated via read_erandom, a wrapper around
- *    the ccdbrg_generate method. (Since "strict FIPS" is disabled,
- *    the DRBG will never request a reseed.)
- *
- *  - After the kernel PRNG is initialized, read_erandom defers
- *    generation to it via read_random_generate. (Note that this
- *    function acquires a per-processor mutex.)
+ * The early instance is a serialized HMAC-SHA256 DRBG seeded with a
+ * domain-separated derivation of bootloader and optional hardware entropy.
+ * After the Rust runtime PRNG is installed, requests use its independent,
+ * synchronized CPU generators instead. Early state is then erased.
  */
 uint64_t
 early_random(void)
 {
 	uint64_t result;
-	static int init = 0;
-
-	if (__improbable(init == 0)) {
-		early_random_init();
-		init = 1;
-	}
 
 	read_erandom(&result, sizeof(result));
 
@@ -282,27 +239,19 @@ early_random(void)
 static void
 read_random_generate(uint8_t *buffer, size_t numbytes);
 
-// This code is used only during early boot (until corecrypto kext is
-// loaded), so it's better not to inline it.
+/* Only used before runtime installation; the caller holds the early lock. */
 __attribute__((noinline))
 static void
 read_erandom_generate(void * buf, size_t nbytes)
 {
 	uint8_t * buffer_bytes = buf;
 	size_t n;
-	int rc;
 
-	// The DBRG request size is limited, so we break the request into
-	// chunks.
+	/* Bound each SP 800-90A Generate request. */
 	while (nbytes > 0) {
 		n = MIN(nbytes, PAGE_SIZE);
 
-		// Since "strict FIPS" is disabled, the DRBG will never
-		// request a reseed; therefore, we panic on any error
-		rc = ccdrbg_generate(&erandom.drbg_info, (struct ccdrbg_state *)erandom.drbg_state, n, buffer_bytes, 0, NULL);
-		if (rc != CCDRBG_STATUS_OK) {
-			panic("read_erandom ccdrbg error %d", rc);
-		}
+		hmac_drbg_sha256_generate(&erandom.drbg, buffer_bytes, n);
 
 		buffer_bytes += n;
 		nbytes -= n;
@@ -312,14 +261,22 @@ read_erandom_generate(void * buf, size_t nbytes)
 __static_testable __mockable void
 read_erandom(void * buf, size_t nbytes)
 {
-	// We defer to the kernel PRNG after it has been installed and
-	// initialized. This happens during corecrypto kext
-	// initialization.
-	if (__probable(prng_ready)) {
+	if (__probable(__atomic_load_n(&prng_ready, __ATOMIC_ACQUIRE))) {
 		read_random_generate(buf, nbytes);
-	} else {
-		read_erandom_generate(buf, nbytes);
+		return;
 	}
+
+	uintptr_t token = xnu_rc_rng_early_lock();
+	if (__atomic_load_n(&prng_ready, __ATOMIC_ACQUIRE)) {
+		xnu_rc_rng_early_unlock(token);
+		read_random_generate(buf, nbytes);
+		return;
+	}
+	if (!erandom_initialized) {
+		early_random_init();
+	}
+	read_erandom_generate(buf, nbytes);
+	xnu_rc_rng_early_unlock(token);
 }
 
 void
@@ -332,9 +289,17 @@ void
 register_and_init_prng(struct cckprng_ctx *ctx, const struct cckprng_funcs *funcs)
 {
 	assert3s(cpu_number(), ==, boot_cpu_id);
-	assert(!prng_ready);
+	assert(!__atomic_load_n(&prng_ready, __ATOMIC_ACQUIRE));
+
+	uintptr_t token = xnu_rc_rng_early_lock();
+	if (!erandom_initialized) {
+		early_random_init();
+	}
+	xnu_rc_rng_early_unlock(token);
 
 	entropy_init(sizeof(entropyseed), entropyseed);
+	/* Serialize seed consumption against genuine early-boot reseeds. */
+	token = xnu_rc_rng_early_lock();
 
 	prng_ctx = ctx;
 	prng_funcs = *funcs;
@@ -342,16 +307,35 @@ register_and_init_prng(struct cckprng_ctx *ctx, const struct cckprng_funcs *func
 	uint64_t nonce = ml_get_timebase();
 	prng_funcs.init_with_getentropy(prng_ctx, MAX_CPUS, sizeof(kprngseed), kprngseed, sizeof(nonce), &nonce, entropy_provide, NULL);
 	prng_funcs.initgen(prng_ctx, boot_cpu_id);
-	prng_ready = 1;
 
-	// Reseed with a key that has been securely combined with kernel-sourced platform randomness, where it was available.
-	// Otherwise this is just more randomness from the bootloader.
+	/* Mix the independently derived boot key and any early user reseeds. */
 	prng_funcs.reseed(prng_ctx, sizeof(kprng_reseed), kprng_reseed);
 
+	cc_clear(sizeof(nonce), &nonce);
 	cc_clear(sizeof(entropyseed), entropyseed);
 	cc_clear(sizeof(kprngseed), kprngseed);
 	cc_clear(sizeof(kprng_reseed), kprng_reseed);
 	cc_clear(sizeof(erandom), &erandom);
+	__atomic_store_n(&prng_ready, 1, __ATOMIC_RELEASE);
+	xnu_rc_rng_early_unlock(token);
+}
+
+void
+xnu_rc_rng_install(void)
+{
+	static const struct cckprng_funcs rust_prng_funcs = {
+		.init = cckprng_init,
+		.initgen = cckprng_initgen,
+		.reseed = cckprng_reseed,
+		.refresh = cckprng_refresh,
+		.generate = cckprng_generate,
+		.init_with_getentropy = cckprng_init_with_getentropy,
+	};
+
+	if (__atomic_load_n(&prng_ready, __ATOMIC_ACQUIRE)) {
+		return;
+	}
+	register_and_init_prng(xnu_rc_kprng_context(), &rust_prng_funcs);
 }
 
 void
@@ -359,7 +343,7 @@ random_cpu_init(int cpu)
 {
 	assert3s(cpu, !=, boot_cpu_id);
 
-	if (!prng_ready) {
+	if (!__atomic_load_n(&prng_ready, __ATOMIC_ACQUIRE)) {
 		panic("random_cpu_init: kernel prng has not been installed");
 	}
 
@@ -370,14 +354,13 @@ random_cpu_init(int cpu)
 __mockable void
 read_random(void * buffer, u_int numbytes)
 {
-	/* corecrypto kext normally registers the Fortuna PRNG via
-	 * register_and_init_prng() during IOKit matching. A non-prelinked
-	 * kernel (QEMU) never loads that kext, so prng_funcs is still
-	 * BSS-zero and refresh/generate would instruction-abort at 0.
-	 * Keep serving the early NIST HMAC-SHA256 DRBG instead. */
-	if (__improbable(!prng_ready)) {
-		read_erandom(buffer, numbytes);
-		return;
+	if (__improbable(!__atomic_load_n(&prng_ready, __ATOMIC_ACQUIRE))) {
+		/* ZALLOC callers precede per-CPU entropy/lock initialization. */
+		if (startup_phase < STARTUP_SUB_EARLY_BOOT) {
+			read_erandom(buffer, numbytes);
+			return;
+		}
+		xnu_rc_rng_install();
 	}
 	prng_funcs.refresh(prng_ctx);
 	read_random_generate(buffer, numbytes);
@@ -421,10 +404,8 @@ read_random_generate(uint8_t *buffer, size_t numbytes)
 int
 write_random(void * buffer, u_int numbytes)
 {
-	/*
-	 * The reseed function requires at least 16 bytes of input entropy,
-	 * hence we always pass the entire seed below, even if it isn't "full".
-	 */
+	/* User input is mixed into existing state, never credited as entropy.
+	 * A fixed-size seed also bounds time spent holding the state lock. */
 	uint8_t seed[SHA512_DIGEST_LENGTH] = {0};
 
 	if (numbytes > SHA512_DIGEST_LENGTH) {
@@ -437,10 +418,29 @@ write_random(void * buffer, u_int numbytes)
 		memcpy(seed, buffer, numbytes);
 	}
 
-	if (__improbable(!prng_ready)) {
-		cc_clear(sizeof(seed), seed);
-		return 0;
+	if (__improbable(!__atomic_load_n(&prng_ready, __ATOMIC_ACQUIRE))) {
+		if (startup_phase >= STARTUP_SUB_EARLY_BOOT) {
+			xnu_rc_rng_install();
+		} else {
+			uintptr_t token = xnu_rc_rng_early_lock();
+			if (!__atomic_load_n(&prng_ready, __ATOMIC_ACQUIRE)) {
+				if (!erandom_initialized) {
+					early_random_init();
+				}
+				hmac_drbg_sha256_reseed(&erandom.drbg, seed, sizeof(seed));
+				uint8_t pending[SEED_SIZE];
+				cchmac(ccsha512_di(), sizeof(kprng_reseed), kprng_reseed,
+				    sizeof(seed), seed, pending);
+				memcpy(kprng_reseed, pending, sizeof(pending));
+				cc_clear(sizeof(pending), pending);
+				xnu_rc_rng_early_unlock(token);
+				cc_clear(sizeof(seed), seed);
+				return 0;
+			}
+			xnu_rc_rng_early_unlock(token);
+		}
 	}
+
 	prng_funcs.reseed(prng_ctx, sizeof(seed), seed);
 	cc_clear(sizeof(seed), seed);
 

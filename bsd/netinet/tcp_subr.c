@@ -140,7 +140,7 @@
 
 #include <net/sockaddr_utils.h>
 
-#include <corecrypto/ccaes.h>
+#include <libkern/crypto/ccmode_abi.h>
 #include <libkern/crypto/aes.h>
 #include <libkern/crypto/md5.h>
 #include <sys/kdebug.h>

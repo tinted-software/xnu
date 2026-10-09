@@ -6,7 +6,6 @@ import subprocess
 from pathlib import Path
 from tools.pcons.mig import MIG_JOBS, plan_mig_job
 from tools.pcons.iig import IIG_NAMES, plan_iig_job
-from tools.pcons.corecrypto import corecrypto_sources, corecrypto_includes
 from tools.pcons.iostorage import iostorage_sources
 
 def nix_str_list(lst, indent=4):
@@ -51,58 +50,6 @@ def find_vendor_dir(name, marker):
                 return d
     return local_path
 
-def export_corecrypto():
-    cc_dir = find_vendor_dir("corecrypto", "ccmode")
-    c_files_raw, s_files_raw = corecrypto_sources(cc_dir)
-    incs_raw = corecrypto_includes(cc_dir)
-    
-    c_files = []
-    xnu_c_files = []
-    prefix = str(cc_dir) + "/"
-    for f in c_files_raw:
-        if f.startswith(prefix):
-            c_files.append(f[len(prefix):])
-        elif f.startswith("external/corecrypto/"):
-            c_files.append(f[len("external/corecrypto/"):])
-        else:
-            xnu_c_files.append(f)
-            
-    s_files = []
-    for f in s_files_raw:
-        if f.startswith(prefix):
-            s_files.append(f[len(prefix):])
-        elif f.startswith("external/corecrypto/"):
-            s_files.append(f[len("external/corecrypto/"):])
-        else:
-            s_files.append(f)
-    
-    incs = []
-    for inc in incs_raw:
-        flag = inc
-        inc_prefix = f"-I{cc_dir}/"
-        if flag.startswith(inc_prefix):
-            incs.append(flag[len(inc_prefix):])
-        elif flag == f"-I{cc_dir}":
-            incs.append("")
-        elif flag.startswith("-Iexternal/corecrypto/"):
-            incs.append(flag[len("-Iexternal/corecrypto/"):])
-        elif flag.startswith("-Iexternal/corecrypto"):
-            incs.append("")
-        else:
-            incs.append(flag)
-
-    Path("nix/components").mkdir(parents=True, exist_ok=True)
-    sources_nix = Path("nix/components/corecrypto-sources.nix")
-    content = f"""# Source list and include flags for CoreCrypto
-{{
-  c = {nix_str_list(c_files, 2)};
-  s = {nix_str_list(s_files, 2)};
-  xnuC = {nix_str_list(xnu_c_files, 2)};
-  includes = {nix_str_list(incs, 2)};
-}}
-"""
-    sources_nix.write_text(content)
-    print(f"Wrote {sources_nix}")
 
 def export_iostorage():
     ios_dir = find_vendor_dir("IOStorageFamily", "IOStorage.cpp")
@@ -190,7 +137,6 @@ def export_iig():
 
 if __name__ == "__main__":
     export_components()
-    export_corecrypto()
     export_iostorage()
     export_mig()
     export_iig()

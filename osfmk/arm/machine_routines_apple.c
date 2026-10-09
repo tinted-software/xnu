@@ -250,7 +250,14 @@ ml_default_jop_pid(void)
 	vmapple_pac_get_default_keys();
 	return vmapple_default_jop_pid;
 #else
-	return 0;
+	/*
+	 * Without hardware key diversification the EL0 and EL1 PAC keys are the
+	 * architectural ones, so the value is only a marker: zero means "no
+	 * signing" (see ml_non_arm64e_user_jop_pid), and vm_shared_region_slide_page
+	 * only signs shared cache pointers for a non-zero key. The default key of
+	 * arm64e tasks must therefore be non-zero.
+	 */
+	return 1;
 #endif /* HAS_PARAVIRTUALIZED_PAC */
 }
 

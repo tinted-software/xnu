@@ -30,9 +30,8 @@
 #include <libkern/crypto/sha2.h>
 #include <libkern/libkern.h>
 #include <kern/debug.h>
-#include <corecrypto/ccdigest.h>
+#include <libkern/crypto/ccdigest_abi.h>
 
-#if defined(CRYPTO_SHA2)
 
 void
 SHA256_Init(SHA256_CTX *ctx)
@@ -131,18 +130,3 @@ SHA512_Final(void *digest, SHA512_CTX *ctx)
 	ccdigest_final(di, ctx->ctx, digest);
 }
 
-#else
-
-/* As these are part of the KPI, we need to stub them out for any kernel configuration that does not support SHA2. */
-
-void UNSUPPORTED_API(SHA256_Init, SHA256_CTX *ctx);
-void UNSUPPORTED_API(SHA384_Init, SHA384_CTX *ctx);
-void UNSUPPORTED_API(SHA512_Init, SHA512_CTX *ctx);
-void UNSUPPORTED_API(SHA256_Update, SHA256_CTX *ctx, const void *data, size_t len);
-void UNSUPPORTED_API(SHA384_Update, SHA384_CTX *ctx, const void *data, size_t len);
-void UNSUPPORTED_API(SHA512_Update, SHA512_CTX *ctx, const void *data, size_t len);
-void UNSUPPORTED_API(SHA256_Final, void *digest, SHA256_CTX *ctx);
-void UNSUPPORTED_API(SHA384_Final, void *digest, SHA384_CTX *ctx);
-void UNSUPPORTED_API(SHA512_Final, void *digest, SHA512_CTX *ctx);
-
-#endif

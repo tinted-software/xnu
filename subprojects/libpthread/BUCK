@@ -1,0 +1,198 @@
+load("//xnu:kernel.bzl", "target_triple")
+load("//xnu:subproject_defs.bzl", "subproject_library_args")
+
+export_file(
+    name = "workqueue_private_h",
+    src = "private/pthread/workqueue_private.h",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "pthread_kext_compat_h",
+    src = "overlay/pthread_kext_compat.h",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(**subproject_library_args(
+    name = "xnu_libpthread",
+    subproject = "libpthread",
+    lang = "c",
+    local = True,
+    extra_includes = [
+        "-Isubprojects/libpthread/overlay",
+        "-Isubprojects/libpthread",
+        "-Isubprojects/libpthread/include",
+        "-Isubprojects/libpthread/private",
+    ],
+    extra_defines = [
+        "-D_PTHREAD_BUILD",
+        "-D_PTHREAD_KERNEL",
+        "-DDRIVER_PRIVATE",
+        "-D_KERNEL_BUILD",
+        "-DKERNEL_BUILD",
+        "-DMACH_KERNEL",
+        "-DBSD_BUILD",
+        "-DBSD_KERNEL_PRIVATE",
+        "-DABSOLUTETIME_SCALAR_TYPE",
+        "-DNEEDS_SCHED_CALL_T",
+        "-D__PTHREAD_EXPOSE_INTERNALS__",
+        "-DPTHREAD_INTERNAL",
+        "-Dpthread_kern=pthread_kext_kern",
+        "-Dcurrent_uthread=pthread_kext_current_uthread",
+        "-Wno-int-conversion",
+        "-include", "subprojects/libpthread/overlay/pthread_kext_compat.h",
+    ],
+))
+
+# Shared pthread sources/flags: the dylib (for libSystem) and the static archive
+# dyld links during bootstrap.
+_PTHREAD_SRCS = [
+    "src/resolver/resolver.c",
+    "src/pthread.c",
+    "src/pthread_cancelable.c",
+    "src/pthread_cond.c",
+    "src/pthread_mutex.c",
+    "src/qos.c",
+    "src/pthread_rwlock.c",
+    "src/pthread_cwd.c",
+    "src/pthread_tsd.c",
+    "src/variants/pthread_cancelable_cancel.c",
+    "src/pthread_atfork.c",
+    "src/pthread_dependency.c",
+    "src/pthread_asm.s",
+]
+
+_PTHREAD_FLAGS = [
+    "-target", target_triple(),
+    "-nostdlibinc",
+    "-fno-common",
+    "-fno-stack-protector",
+    "-D__DARWIN_ONLY_VERS_1050=1",
+    "-D__DARWIN_ONLY_UNIX_CONFORMANCE=1",
+    "-D__DARWIN_ONLY_64_BIT_INO_T=1",
+    # Upstream pthread.xcconfig BASE_PREPROCESSOR_MACROS. __POSIX_LIB__ selects
+    # the full struct sched_param (with `quantum`) in pthread/posix_sched.h.
+    "-D__LIBC__",
+    "-D__POSIX_LIB__",
+    "-D__PTHREAD_BUILDING_PTHREAD__=1",
+    "-D_PTHREAD_BUILD",
+    "-D__PTHREAD_EXPOSE_INTERNALS__",
+    "-DPTHREAD_INTERNAL",
+    # libpthread must not see libc's private feature header; it selects
+    # PLOCKSTAT, which belongs to the introspection variant only.
+    "-D_LIBC_NO_FEATURE_VERIFICATION=1",
+    "-Wno-error=int-conversion",
+    "-Wno-int-conversion",
+    "-Wno-error=incompatible-pointer-types",
+    "-Wno-incompatible-pointer-types",
+    "-DTARGET_OS_EXCLAVECORE=0",
+    "-DTARGET_OS_EXCLAVEKIT=0",
+    "-Isubprojects/libpthread",
+    "-Wno-nullability-completeness",
+    "-Isubprojects/libpthread/include",
+    "-Isubprojects/libpthread/src",
+    "-Isubprojects/libpthread/src/include",
+    "-Isubprojects/libpthread/src/resolver",
+    "-Isubprojects/libpthread/src/private",
+    "-Isubprojects/libpthread/private",
+    "-Iuserspace/libplatform/include",
+    "-Iuserspace/libplatform/private",
+    "-Iuserspace/libc/include",
+    "-Iuserspace/dyld/include",
+    "-Iuserspace/libmalloc/include",
+    "-Iuserspace/libmalloc/private",
+    "-I$(location //userspace:system_headers)",
+    "-I$(location //:userspace_generated)/include",
+    "-I$(location //:xnu_codegen)/mig",
+    "-IEXTERNAL_HEADERS",
+    "-Iosfmk",
+    "-Isubprojects/libdispatch",
+    "-Ibsd",
+    "-Ilibkern",
+    "-Ilibsyscall",
+    "-Ilibsyscall/mach",
+    "-Ilibsyscall/os",
+    "-Ilibsyscall/wrappers",
+    "-Ilibsyscall/wrappers/spawn",
+    "-Isubprojects/libpthread/include/pthread",
+]
+
+_PTHREAD_LANG_FLAGS = {
+    "c": [
+        # PRIVATE exposes the SPIs (e.g. sys/ulock.h flags); only C/C++.
+        "-DPRIVATE",
+        "-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h",
+        "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+        "-include", "osfmk/mach/thread_policy_private.h",
+    ],
+    "cxx": [
+        "-DPRIVATE",
+        "-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h",
+        "-include", "EXTERNAL_HEADERS/xros_availability_aliases.h",
+        "-include", "osfmk/mach/thread_policy_private.h",
+    ],
+}
+
+cxx_library(
+    name = "libsystem_pthread",
+    srcs = _PTHREAD_SRCS,
+    deps = [
+        "//userspace:system_headers",
+        "//userspace/AvailabilityVersions:headers",
+        "//:xnu_codegen",
+        "//:userspace_generated",
+        "//:libsystem_kernel",
+    ],
+    preferred_linkage = "shared",
+    soname = "libsystem_pthread.dylib",
+    compiler_flags = _PTHREAD_FLAGS,
+    lang_compiler_flags = _PTHREAD_LANG_FLAGS,
+    linker_flags = ["-nostdlib"],
+    post_linker_flags = [
+        "-Wl,-install_name,/usr/lib/system/libsystem_pthread.dylib",
+    ],
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# Static dyld variant for the bootstrap link (dyld cannot depend on the dylib).
+cxx_library(
+    name = "libsystem_pthread_dyld",
+    srcs = _PTHREAD_SRCS,
+    deps = [
+        "//userspace:system_headers",
+        "//userspace/AvailabilityVersions:headers",
+        "//:xnu_codegen",
+        "//:userspace_generated",
+        "//:libsystem_kernel_static",
+        "//userspace/libplatform:libsystem_platform_dyld",
+    ],
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    # The dyld variant (upstream VARIANT_DYLD): static main thread, no malloc hooks,
+    # and no JIT write-protect allowlist, which needs the unsupported rwx mechanism.
+    compiler_flags = _PTHREAD_FLAGS + ["-DVARIANT_DYLD=1", "-DVARIANT_STATIC=1"],
+    lang_compiler_flags = _PTHREAD_LANG_FLAGS,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# Normal (non-dyld) static archive of libpthread, for the merged libSystem.
+cxx_library(
+    name = "libsystem_pthread_objects",
+    srcs = _PTHREAD_SRCS,
+    deps = [
+        "//userspace:system_headers",
+        "//userspace/AvailabilityVersions:headers",
+        "//:xnu_codegen",
+        "//:userspace_generated",
+    ],
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    compiler_flags = _PTHREAD_FLAGS,
+    lang_compiler_flags = _PTHREAD_LANG_FLAGS,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

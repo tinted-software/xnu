@@ -1,0 +1,5 @@
+rustc_flags = ["--cfg", "polyval_force_soft"]
+omit_deps = ["cpufeatures"]
+# precise_srcs follows `mod` declarations but not the ones selected by cfg_attr
+# paths (the soft backends), so list them.
+extra_srcs = ["src/field_element/mul32.rs", "src/field_element/mul64.rs"]

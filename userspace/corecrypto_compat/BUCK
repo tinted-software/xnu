@@ -1,0 +1,43 @@
+# corecrypto replacements (corecrypto is not published). Currently: the
+# ccdigest/ccsha2 SHA-256 subset that libmalloc's xzone allocator uses.
+# ccsha2.rs is the RustCrypto sha2 primitive; ccsha2.c is the C digest-info table.
+
+load("//userspace/libc:sources.bzl", "LIBC_BASE_FLAGS", "LIBC_INCLUDE_FLAGS")
+
+rust_library(
+    name = "ccsha2_rs",
+    srcs = ["ccsha2.rs"],
+    crate = "ccsha2_rs",
+    crate_root = "ccsha2.rs",
+    edition = "2021",
+    deps = ["//third-party/rust:sha1", "//third-party/rust:sha2", "//userspace/rust_panic:rust_panic"],
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+cxx_library(
+    name = "ccsha2",
+    srcs = ["ccsha2.c"],
+    raw_headers = [
+        "include/corecrypto/ccdigest.h",
+        "include/corecrypto/ccsha1.h",
+        "include/corecrypto/ccsha2.h",
+    ],
+    compiler_flags = ["-include", "EXTERNAL_HEADERS/xros_availability_aliases.h"] +
+        LIBC_BASE_FLAGS +
+        ["-Iuserspace/corecrypto_compat/include", "-Iuserspace/libc/include"] +
+        LIBC_INCLUDE_FLAGS,
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    deps = [
+        ":ccsha2_rs",
+        "//userspace/AvailabilityVersions:headers",
+        "//:userspace_generated",
+    ],
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

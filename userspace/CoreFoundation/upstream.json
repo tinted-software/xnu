@@ -1,0 +1,291 @@
+{
+  "project": "CF",
+  "repository": "https://github.com/apple-oss-distributions/CF",
+  "tag": "CF-1153.18",
+  "commit": "dc54c6bb1c1e5e0b9486c1d26dd5bef110b20bf3",
+  "files": [
+    {
+      "path": "include/CoreFoundation/CFArray.h",
+      "upstream_path": "CFArray.h",
+      "upstream_sha256": "1643fff4344f7aae2f4f887ec1ac18826c806fb3f72e2824098719b8eeb2accc",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFAvailability.h",
+      "upstream_path": "CFAvailability.h",
+      "upstream_sha256": "c993e462589f2aa25cded8a87b4e73669d67de4fe559302ecbaca8f4f331585b",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFBag.h",
+      "upstream_path": "CFBag.h",
+      "upstream_sha256": "3455d9ee3f0d97bc74948c0d2e0581958f6389407a46f12a806065d69b98df56",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFBase.h",
+      "upstream_path": "CFBase.h",
+      "upstream_sha256": "99113f53a6724fc5fb07c8ec5791dc6b1f459c2a12113486b69f22c1099a55a1",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFBinaryHeap.h",
+      "upstream_path": "CFBinaryHeap.h",
+      "upstream_sha256": "ccf7fdb190be1dc9bc61aa6bfb93dd7eb0333d79347cf8c6da1912aa2be37484",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFBitVector.h",
+      "upstream_path": "CFBitVector.h",
+      "upstream_sha256": "4c6c826f3265453f7ddb728c644fee145c57529c655902308f4aa6f2a27af0d6",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFBundle.h",
+      "upstream_path": "CFBundle.h",
+      "upstream_sha256": "027cbbd1ddeca5bb54818664c63e40b3db206d313acdc005b03d39e54cec5724",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFByteOrder.h",
+      "upstream_path": "CFByteOrder.h",
+      "upstream_sha256": "fbb00076c1fdc2d49cefea9c408fda4cad9967ae46bc416499340e3c6e917dd2",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFCalendar.h",
+      "upstream_path": "CFCalendar.h",
+      "upstream_sha256": "a164e4fafd24bd5ce4749e178663a2db39dcbf8c084eb857b407ec8b1353e492",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFCharacterSet.h",
+      "upstream_path": "CFCharacterSet.h",
+      "upstream_sha256": "772579a3eefd976263475b83d0876268b84cbd15622b0f34f05af9bca36188b3",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFData.h",
+      "upstream_path": "CFData.h",
+      "upstream_sha256": "a58a50be5d2af28542a3eaa671b89c923a3a653c6a4a174ef84973f10a7aed93",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFDate.h",
+      "upstream_path": "CFDate.h",
+      "upstream_sha256": "db8f1e221d82778b51528adf5f26ab68b0101a4d1f7dbcc0945dd6293aac720a",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFDateFormatter.h",
+      "upstream_path": "CFDateFormatter.h",
+      "upstream_sha256": "31776ad207c95ff8bcfa54ff7cb1851ac3eb7937a8d78825759ba44254b7a39f",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFDictionary.h",
+      "upstream_path": "CFDictionary.h",
+      "upstream_sha256": "2f5c11193ea18bbeebcdb4df269e4fc58b0cc8522c4a25f20eb43af4664af672",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFError.h",
+      "upstream_path": "CFError.h",
+      "upstream_sha256": "e9670b8cf2e1d1736419165e03dce4296517efd1c7e442213dca2e3d0e5b4e40",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFLocale.h",
+      "upstream_path": "CFLocale.h",
+      "upstream_sha256": "65af5a5728d30a47c554533a8b826f7c501de930be8807d3449899adfbed2e5c",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFMachPort.h",
+      "upstream_path": "CFMachPort.h",
+      "upstream_sha256": "d5bca310efcaf4105710c0082875227cc18aca758857dd4306625493e538fdc4",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFMessagePort.h",
+      "upstream_path": "CFMessagePort.h",
+      "upstream_sha256": "03ae42efbaac23cc4b93a5e360d25d925f34ffb64dc9c840fd5031bb6ac4f078",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFNumber.h",
+      "upstream_path": "CFNumber.h",
+      "upstream_sha256": "5db6fc331db5b9d8834f89b230946bd613e6651eee1c738bd6baee7127e0f2c5",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFNumberFormatter.h",
+      "upstream_path": "CFNumberFormatter.h",
+      "upstream_sha256": "51850f358f9665ceb7f246b30b19fbfcf31cf31f7d4387c03a3d0ea3496162ef",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFPlugIn.h",
+      "upstream_path": "CFPlugIn.h",
+      "upstream_sha256": "ab09a9402fd54120da49f6290e214ee515e9c36c157ce69355e2eb96de88b53b",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFPlugInCOM.h",
+      "upstream_path": "CFPlugInCOM.h",
+      "upstream_sha256": "eddb585d7159afcf81a1cb50984d4060b9598c487fa8f86b7f7c5043a486c177",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFPreferences.h",
+      "upstream_path": "CFPreferences.h",
+      "upstream_sha256": "7e4a4d7aa806fa9ed70b549e2883965f81fb5fb57100d814a4126117930a027c",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFPropertyList.h",
+      "upstream_path": "CFPropertyList.h",
+      "upstream_sha256": "fd29510f66b4c626a4ff3442f6e1514ba4895702b4d394e83bede011c9608b6a",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFRunLoop.h",
+      "upstream_path": "CFRunLoop.h",
+      "upstream_sha256": "9e0c210c8e8c9762c5c70810293868e9d1d67dd46d167cd24e5d2d707f6aae5f",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFSet.h",
+      "upstream_path": "CFSet.h",
+      "upstream_sha256": "d8033436b3dc2cef9af17b0ec01385ee408a92f820b10fd74accfbe027003a35",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFSocket.h",
+      "upstream_path": "CFSocket.h",
+      "upstream_sha256": "07463dac5211f53b8110b19ef93844bd8409a8f59e44bf2a4fa7a44c4bedce68",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFStream.h",
+      "upstream_path": "CFStream.h",
+      "upstream_sha256": "bd77de422f89d449e988896b308cad9b1c594f092c4195fbc1288aae69c40ca2",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFString.h",
+      "upstream_path": "CFString.h",
+      "upstream_sha256": "cf75529893cdc01679d6e02ebfdf2c3ba1357ff671a49ae9f2468507737e99b3",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFStringEncodingExt.h",
+      "upstream_path": "CFStringEncodingExt.h",
+      "upstream_sha256": "2ef098ed6eba375476caa94e77a7b18e45084bf698eff6539d0e1b31e59f210e",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFTimeZone.h",
+      "upstream_path": "CFTimeZone.h",
+      "upstream_sha256": "7d7659684b5b1d8bd8f0ff678370372794628d33979f58fe258427a7ccedce24",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFTree.h",
+      "upstream_path": "CFTree.h",
+      "upstream_sha256": "2c23b727416460693d318fe0c3e21142fd9036f78ffe58f3f9eb2136c014ed56",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFURL.h",
+      "upstream_path": "CFURL.h",
+      "upstream_sha256": "63b3d003f186e598b996557f05c1031613f880810df8d75499c905660aa32a47",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFURLAccess.h",
+      "upstream_path": "CFURLAccess.h",
+      "upstream_sha256": "329600ba6790ecde43437a34e1b19bb9c61e08650fade407d1b4668b53ba8b69",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFUUID.h",
+      "upstream_path": "CFUUID.h",
+      "upstream_sha256": "a95f20f38c0db1a0d0dadcfee14303cdf919d99d7e1f0f1f25e7f207463cbfb7",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFUserNotification.h",
+      "upstream_path": "CFUserNotification.h",
+      "upstream_sha256": "a6319372634158310a2fe0a8896288be88687d4ec2b21987ad6ccbeb8eaaff08",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFUtilities.h",
+      "upstream_path": "CFUtilities.h",
+      "upstream_sha256": "dd29fbf2b170683a630f30476932f70d1d4e3c8703c79ba0a598f2eadf01854b",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFXMLNode.h",
+      "upstream_path": "CFXMLNode.h",
+      "upstream_sha256": "b8fdd45d1252ae6772f4e4c7f411ddfa8be1c8de704d4b8f565e05637ebaf777",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CFXMLParser.h",
+      "upstream_path": "CFXMLParser.h",
+      "upstream_sha256": "ff42eef94bc77630204e4b3aff303ab84d710e18b74fc58db5b2a8e1b597221e",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/CoreFoundation/CoreFoundation.h",
+      "upstream_path": "CoreFoundation.h",
+      "upstream_sha256": "36008d057cd2bede2d537e2b6c03ac685983025974c6bca8618ccfad9dd6036c",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    }
+  ],
+  "notes": [
+    "Header-only public include closure of CoreFoundation.h, CFPlugInCOM.h, and CFMachPort.h. No CoreFoundation implementation is compiled or linked by this vendor."
+  ]
+}

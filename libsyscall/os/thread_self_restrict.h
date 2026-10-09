@@ -26,6 +26,72 @@
  * @APPLE_OSREFERENCE_LICENSE_HEADER_END@
  */
 
+/*
+ * PORT STAND-IN. The rwx and TPRO implementations (os_thread_self_restrict_*)
+ * are unpublished Apple code; upstream xnu ships only this empty guard. This port
+ * reports the rwx mechanism as unsupported, so every caller takes its existing
+ * "unsupported" path: pthread_jit_write_protect_np and the JIT allowlist are
+ * no-ops, and pthread_jit_write_with_callback_np invokes the callback directly.
+ * Consequence: no hardware W^X toggling of JIT pages in this port.
+ */
 #ifndef OS_THREAD_SELF_RESTRICT_H
 #define OS_THREAD_SELF_RESTRICT_H
+
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+static inline bool
+os_thread_self_restrict_rwx_is_supported(void)
+{
+	return false;
+}
+
+static inline void
+os_thread_self_restrict_rwx_to_rx(void)
+{
+}
+
+static inline void
+os_thread_self_restrict_rwx_to_rw(void)
+{
+}
+
+/*
+ * TPRO: per-thread toggle of the hardware-assisted read-only mapping
+ * (APRR-based, Apple silicon only). The register interface is unpublished
+ * and QEMU does not model it, so this port reports TPRO as unsupported.
+ * Consequence: dyld and libpthread keep TPRO regions writable; there is no
+ * hardware write protection for them. `is_writable` is true so a caller that
+ * reaches it without checking `is_supported` sees the regions as writable
+ * rather than as protected.
+ */
+static inline bool
+os_thread_self_restrict_tpro_is_supported(void)
+{
+	return false;
+}
+
+static inline bool
+os_thread_self_restrict_tpro_is_writable(void)
+{
+	return true;
+}
+
+static inline void
+os_thread_self_restrict_tpro_to_rw(void)
+{
+}
+
+static inline void
+os_thread_self_restrict_tpro_to_ro(void)
+{
+}
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* OS_THREAD_SELF_RESTRICT_H */

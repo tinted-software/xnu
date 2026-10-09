@@ -1,0 +1,9 @@
+rust_library(
+    name = "rust_panic",
+    srcs = ["lib.rs"],
+    crate = "rust_panic",
+    crate_root = "lib.rs",
+    edition = "2021",
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)

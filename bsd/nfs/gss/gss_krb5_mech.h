@@ -26,12 +26,8 @@
  * @APPLE_OSREFERENCE_LICENSE_HEADER_END@
  */
 
-#include <corecrypto/ccdigest.h>
-#include <corecrypto/cchmac.h>
-#include <corecrypto/ccsha1.h>
-#include <corecrypto/ccdes.h>
-#include <corecrypto/ccaes.h>
-#include <corecrypto/ccpad.h>
+#include <libkern/crypto/ccdigest_abi.h>
+#include <libkern/crypto/ccmode_abi.h>
 
 /*
  * GSS-API things from gssapi.h
@@ -332,7 +328,6 @@ gss_ctx_id_t gss_krb5_make_context(void *, uint32_t);
 
 void gss_krb5_mech_init(void);
 
-int corecrypto_available(void);
 
 errno_t gss_normalize_mbuf(mbuf_t, size_t, size_t *, mbuf_t *, mbuf_t *, int);
 

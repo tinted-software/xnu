@@ -187,6 +187,8 @@ fbt_invop(uintptr_t addr, uintptr_t * stack, uintptr_t rval)
 #define T_INVALID_OPCODE EXC_BAD_INSTRUCTION
 #define FBT_EXCEPTION_CODE T_INVALID_OPCODE
 
+/* The asm blocks below define global labels, so the body must not be duplicated or merged. */
+__attribute__((optnone))
 kern_return_t
 fbt_perfCallback(
 	int trapno,

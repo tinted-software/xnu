@@ -5,7 +5,7 @@
 __BEGIN_DECLS
 
 #include <stdint.h>
-#include <corecrypto/ccsha1.h>
+#include <libkern/crypto/ccdigest_abi.h>
 
 /*
  * CDHashes in the trust cache are always truncated to the length of a SHA1 hash.

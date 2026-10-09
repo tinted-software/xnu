@@ -1,0 +1,4 @@
+# Linked into the kernel (//rust/xnurc) and run on a fixed-size kernel stack:
+# unoptimized builds have multi-KiB frames (the volume mount path nests ~30 KiB
+# at -O0), so always compile with optimization.
+rustc_flags = ["-C", "opt-level=s"]

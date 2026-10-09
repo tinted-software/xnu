@@ -1,5 +1,0 @@
-[wrap-git]
-url = https://github.com/apple-oss-distributions/msdosfs.git
-revision = c9f076c4e7c10b4bc3b0177d114aedf1bb8b9109
-depth = 1
-patch_directory = msdosfs

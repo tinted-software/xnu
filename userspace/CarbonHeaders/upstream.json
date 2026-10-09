@@ -1,0 +1,28 @@
+{
+  "project": "CarbonHeaders",
+  "repository": "https://github.com/apple-oss-distributions/CarbonHeaders",
+  "tag": "CarbonHeaders-18.1",
+  "commit": "214a9ae7ab3c0c78ddb50328ca226e6313c4c782",
+  "files": [
+    {
+      "path": "include/MacTypes.h",
+      "upstream_path": "MacTypes.h",
+      "upstream_sha256": "2427ccecb33e33fdd202bf46a6dc9ec635bb50f713bb80c2c457c97edf0c0530",
+      "source_encoding": "utf-8",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/ConditionalMacros.h",
+      "upstream_path": "ConditionalMacros.h",
+      "upstream_sha256": "e013d893073dd55a84d1efded171234f2f387fc6f06cde5bedbc8a199548d8cc",
+      "source_encoding": "mac_roman",
+      "vendored_encoding": "utf-8"
+    }
+  ],
+  "notes": [
+    "CarbonHeaders source headers specify APSL 2.0 but its archive does not include standalone license text. APPLE_LICENSE retains the APSL 2.0 text from the pinned Apple CF distribution.",
+    "AvailabilityMacros.h and TargetConditionals.h resolve to the existing EXTERNAL_HEADERS providers; old CarbonHeaders copies are intentionally not installed because they predate arm64.",
+    "Legacy Mac Roman source comments are losslessly transcoded to UTF-8 where needed. Declarations and definitions are unmodified."
+  ],
+  "license_source": "https://github.com/apple-oss-distributions/CF/blob/dc54c6bb1c1e5e0b9486c1d26dd5bef110b20bf3/APPLE_LICENSE"
+}

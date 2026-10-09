@@ -1,0 +1,41 @@
+# ccrng replacement for libc's arc4random (corecrypto is not published).
+# See ccrng.c for the design; ccrng.rs is the ChaCha20 keystream primitive,
+# built on the vendored RustCrypto chacha20 crate.
+
+load("//userspace/libc:sources.bzl", "LIBC_BASE_FLAGS", "LIBC_INCLUDE_FLAGS")
+
+rust_library(
+    name = "ccrng_rs",
+    srcs = ["ccrng.rs"],
+    crate = "ccrng_rs",
+    crate_root = "ccrng.rs",
+    edition = "2021",
+    deps = ["//third-party/rust:chacha20", "//userspace/rust_panic:rust_panic"],
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
+
+# Same include environment as libsystem_c_objects, so <sys/_types.h> and the
+# Availability chain resolve identically for this translation unit.
+cxx_library(
+    name = "ccrng",
+    srcs = ["ccrng.c"],
+    raw_headers = ["include/corecrypto/ccrng.h"],
+    compiler_flags = ["-include", "EXTERNAL_HEADERS/xros_availability_aliases.h"] +
+        LIBC_BASE_FLAGS +
+        ["-Iuserspace/libc/ccrng/include", "-Iuserspace/libc/include"] +
+        LIBC_INCLUDE_FLAGS,
+    lang_compiler_flags = {
+        "c": ["-include", "$(location //userspace/AvailabilityVersions:headers)/Availability.h"],
+    },
+    deps = [
+        ":ccrng_rs",
+        "//userspace/AvailabilityVersions:headers",
+        "//:userspace_generated",
+    ],
+    preferred_linkage = "static",
+    link_style = "static_pic",
+    link_whole = True,
+    default_target_platform = "//platforms:aarch64-darwin",
+    visibility = ["PUBLIC"],
+)
