@@ -12,12 +12,7 @@
 
 __ptrcheck_abi_assume_single();
 
-// The kernel doesn't have access to this one
-#if __has_include (<corecrypto/ccder.h>)
-#include <corecrypto/ccder.h>
-#else
-typedef unsigned long ccder_tag;
-#endif
+#include <libkern/crypto/cc_abi.h>
 
 
 /*!

@@ -708,7 +708,7 @@ vms_path_update_holes_eagerly(vms_path_t path, uint32_t pos, uint32_t mask)
 #pragma mark vm map store creation/destruction
 
 /*
- * This is done during EARLY_BOOT as it needs the corecrypto module to be
+ * This is done during EARLY_BOOT as the runtime RNG needs to be
  * set up.
  */
 __startup_func

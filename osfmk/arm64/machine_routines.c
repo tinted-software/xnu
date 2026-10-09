@@ -1742,7 +1742,7 @@ ml_processor_register(ml_processor_info_t *in_processor_info,
 	 * To avoid predictable allocation tags, we want to initialize
 	 * RGSR_EL1.SEED as early as possible.  Unfortunately this happens
 	 * too early during secondary CPU startup to safely use the
-	 * corecrypto-backed PRNG.  So the primary CPU will generate
+	 * runtime PRNG.  So the primary CPU will generate
 	 * the seeds on their behalf.
 	 */
 	if (!is_boot_cpu) {

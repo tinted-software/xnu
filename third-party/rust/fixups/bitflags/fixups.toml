@@ -1,0 +1,5 @@
+# The kernel (//rust/xnurc, via hadris-fs) links bitflags into a freestanding
+# no_std crate. Cargo's feature unification enables `std` for macOS targets
+# because of the gpui dependency tree, which would pull libstd's panic_impl
+# lang item into the kernel. `std` only adds `std::error::Error` impls.
+omit_features = ["std"]

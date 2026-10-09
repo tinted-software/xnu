@@ -1,0 +1,5 @@
+rustc_flags = [
+    "--cfg",
+    'aes_backend="soft"',
+]
+omit_deps = ["cpufeatures"]

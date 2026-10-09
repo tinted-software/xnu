@@ -51,7 +51,7 @@ extern "C" {
 #include <uuid/uuid.h>
 #include <sys/vnode_internal.h>
 #include <sys/mount.h>
-#include <corecrypto/ccsha2.h>
+#include <libkern/crypto/ccdigest_abi.h>
 #include <kdp/sk_core.h>
 #include <pexpert/device_tree.h>
 #include <kern/startup.h>
@@ -1070,7 +1070,9 @@ IOSecureBSDRoot(const char * rootName)
 
 	matching = IOService::serviceMatching("IOPlatformExpert");
 	assert(matching);
-	pe = (IOPlatformExpert *) IOService::waitForMatchingService(matching, 30ULL * kSecondScale);
+	/* The root is already mounted: use the platform expert if one has
+	 * matched, rather than stalling boot for it. */
+	pe = (IOPlatformExpert *) IOService::copyMatchingService(matching);
 	matching->release();
 	if (!pe) {
 		kprintf("IOSecureBSDRoot: no IOPlatformExpert, skipping\n");

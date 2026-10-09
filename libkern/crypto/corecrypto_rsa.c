@@ -28,7 +28,6 @@
 
 #include <libkern/crypto/crypto_internal.h>
 #include <libkern/crypto/rsa.h>
-#include <corecrypto/ccrsa.h>
 
 
 int
@@ -36,9 +35,8 @@ rsa_make_pub(rsa_pub_ctx *pub,
     size_t exp_nbytes, const uint8_t *exp,
     size_t mod_nbytes, const uint8_t *mod)
 {
-	if ((exp_nbytes > RSA_MAX_KEY_BITSIZE / 8)
-	    || (mod_nbytes > RSA_MAX_KEY_BITSIZE / 8)) {
-		return -1; // Too big
+	if (pub == NULL) {
+		return CCERR_PARAMETER;
 	}
 	ccrsa_ctx_n(pub->key) = ccn_nof(RSA_MAX_KEY_BITSIZE);
 	return g_crypto_funcs->ccrsa_make_pub_fn(pub->key,
@@ -52,6 +50,12 @@ rsa_verify_pkcs1v15(rsa_pub_ctx *pub, const uint8_t *oid,
     size_t sig_len, const uint8_t *sig,
     bool *valid)
 {
+	if (pub == NULL) {
+		if (valid != NULL) {
+			*valid = false;
+		}
+		return CCERR_PARAMETER;
+	}
 	return g_crypto_funcs->ccrsa_verify_pkcs1v15_fn(pub->key, oid,
 	           digest_len, digest,
 	           sig_len, sig, valid);

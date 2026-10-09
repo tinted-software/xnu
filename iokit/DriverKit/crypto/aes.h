@@ -34,17 +34,21 @@ extern "C"
 {
 #endif
 
-#include <corecrypto/ccmode.h>
-#include <corecrypto/ccn.h>
+#include <libkern/crypto/ccmode_abi.h>
 
 #define AES_BLOCK_SIZE  16  /* the AES block size in bytes          */
 
-//Unholy HACK: this works because we know the size of the context for every
-//possible corecrypto implementation is less than this.
+/* Fixed public storage capacity, retained independently of the provider. */
 #if defined(__ARM_NEON__) && !defined(__arm64__)        // for expanded keys in bit slice format
 #define AES_CBC_CTX_MAX_SIZE (ccn_sizeof_size(sizeof(void *)) + ccn_sizeof_size(AES_BLOCK_SIZE) + ccn_sizeof_size(64*4) + (14-1)*128+32 )
 #else
 #define AES_CBC_CTX_MAX_SIZE (ccn_sizeof_size(sizeof(void *)) + ccn_sizeof_size(AES_BLOCK_SIZE) + ccn_sizeof_size(64*4))
+#endif
+
+#ifdef __cplusplus
+static_assert(AES_CBC_CTX_MAX_SIZE >= XNU_RC_AES_KEY_CTX_SIZE, "AES context capacity");
+#else
+_Static_assert(AES_CBC_CTX_MAX_SIZE >= XNU_RC_AES_KEY_CTX_SIZE, "AES context capacity");
 #endif
 
 typedef struct{

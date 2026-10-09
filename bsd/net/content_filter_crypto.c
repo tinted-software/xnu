@@ -5,7 +5,7 @@
 
 #include <sys/systm.h>
 #include <sys/errno.h>
-#include <corecrypto/cchmac.h>
+#include <libkern/crypto/ccdigest_abi.h>
 #include <net/content_filter.h>
 #include <net/content_filter_crypto.h>
 

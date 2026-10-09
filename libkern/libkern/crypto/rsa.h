@@ -34,8 +34,8 @@ extern "C"
 {
 #endif
 
-#include <corecrypto/ccrsa.h>
-#define RSA_MAX_KEY_BITSIZE 4096
+#include <libkern/crypto/rsa_abi.h>
+#define RSA_MAX_KEY_BITSIZE XNU_RC_RSA_MAX_KEY_BITS
 
 typedef struct{
 	ccrsa_pub_ctx_decl(ccn_sizeof(RSA_MAX_KEY_BITSIZE), key);

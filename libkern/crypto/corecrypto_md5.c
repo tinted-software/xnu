@@ -1,7 +1,7 @@
 #include <libkern/crypto/crypto_internal.h>
 #include <libkern/crypto/md5.h>
 #include <kern/debug.h>
-#include <corecrypto/ccdigest.h>
+#include <libkern/crypto/ccdigest_abi.h>
 
 static uint64_t
 getCount(MD5_CTX *ctx)
@@ -22,7 +22,7 @@ DiToMD5(const struct ccdigest_info *di, struct ccdigest_ctx *di_ctx, MD5_CTX *md
 {
 	setCount(md5_ctx, ccdigest_nbits(di, di_ctx) / 8 + ccdigest_num(di, di_ctx));
 	memcpy(md5_ctx->buffer, ccdigest_data(di, di_ctx), di->block_size);
-	memcpy(md5_ctx->state, ccdigest_state_ccn(di, di_ctx), di->state_size);
+	memcpy(md5_ctx->state, ccdigest_state(di, di_ctx), di->state_size);
 }
 
 /* Copy a legacy MD5 context into a ccdigest ctx  */
@@ -34,7 +34,7 @@ MD5ToDi(const struct ccdigest_info *di, MD5_CTX *md5_ctx, struct ccdigest_ctx *d
 	ccdigest_num(di, di_ctx) = (unsigned)(count % di->block_size);
 	ccdigest_nbits(di, di_ctx) = (count - ccdigest_num(di, di_ctx)) * 8;
 	memcpy(ccdigest_data(di, di_ctx), md5_ctx->buffer, di->block_size);
-	memcpy(ccdigest_state_ccn(di, di_ctx), md5_ctx->state, di->state_size);
+	memcpy(ccdigest_state(di, di_ctx), md5_ctx->state, di->state_size);
 }
 
 void

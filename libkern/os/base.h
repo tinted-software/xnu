@@ -355,7 +355,15 @@ typedef void (^os_block_t)(void);
 #if __has_feature(ptrauth_calls)
 #include <ptrauth.h>
 #define OS_PTRAUTH_SIGNED_PTR(type) __ptrauth(ptrauth_key_process_independent_data, 1, ptrauth_string_discriminator(type))
+#if !defined(XNU_PTRAUTH_NO_AUTH_NULL_SCHEMA)
+/* The 4th-argument "authenticates-null-values" __ptrauth schema is an Apple
+ * clang extension; belt it out with -DXNU_PTRAUTH_NO_AUTH_NULL_SCHEMA on
+ * toolchains that reject it (system LLVM 23). The pointers stay 3-arg
+ * signed - same key/address/discriminator, without the null-check schema. */
 #define OS_PTRAUTH_SIGNED_PTR_AUTH_NULL(type) __ptrauth(ptrauth_key_process_independent_data, 1, ptrauth_string_discriminator(type), "authenticates-null-values")
+#else
+#define OS_PTRAUTH_SIGNED_PTR_AUTH_NULL(type) __ptrauth(ptrauth_key_process_independent_data, 1, ptrauth_string_discriminator(type))
+#endif
 #define OS_PTRAUTH_DISCRIMINATOR(str) ptrauth_string_discriminator(str)
 #define __ptrauth_only
 #else //  __has_feature(ptrauth_calls)

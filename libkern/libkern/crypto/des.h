@@ -33,18 +33,24 @@
 extern "C" {
 #endif
 
-#include <corecrypto/ccmode.h>
-#include <corecrypto/ccdes.h>
-#include <corecrypto/ccn.h>
+#include <libkern/crypto/ccmode_abi.h>
 
 /* must be 32bit quantity */
 #define DES_LONG u_int32_t
 
 typedef unsigned char des_cblock[8];
 
-/* Unholy hack: this is currently the size for the only implementation of DES in corecrypto */
+/* Fixed public storage capacities, retained independently of the provider. */
 #define DES_ECB_CTX_MAX_SIZE (64*4)
 #define DES3_ECB_CTX_MAX_SIZE (64*4*3)
+
+#ifdef __cplusplus
+static_assert(DES_ECB_CTX_MAX_SIZE >= XNU_RC_DES_KEY_CTX_SIZE &&
+    DES3_ECB_CTX_MAX_SIZE >= XNU_RC_TDES_KEY_CTX_SIZE, "DES context capacities");
+#else
+_Static_assert(DES_ECB_CTX_MAX_SIZE >= XNU_RC_DES_KEY_CTX_SIZE &&
+    DES3_ECB_CTX_MAX_SIZE >= XNU_RC_TDES_KEY_CTX_SIZE, "DES context capacities");
+#endif
 
 
 typedef struct{

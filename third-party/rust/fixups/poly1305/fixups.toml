@@ -1,0 +1,2 @@
+rustc_flags = ["--cfg", "poly1305_force_soft"]
+omit_deps = ["cpufeatures"]

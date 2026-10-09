@@ -28,13 +28,24 @@
 
 extern void iokit_post_constructor_init(void);
 
-static void last_kernel_constructor(void) __attribute__ ((constructor));
-
-static void
+static void __attribute__((used))
 last_kernel_constructor(void)
 {
 	iokit_post_constructor_init();
 }
+
+/*
+ * Registered by hand rather than with __attribute__((constructor)): a
+ * kernelcache's MH_FILESET boot code requires a non-empty __LASTDATA_CONST (it
+ * ends the kernel's constant data, with the kexts' following it), and the
+ * constructor that must run after every other one belongs there. The pointer
+ * is plain, like any compiler-emitted constructor; the kernel signs it at boot
+ * (OSRuntimeSignStructors).
+ */
+__asm__(".pushsection __LASTDATA_CONST,__mod_init_func,mod_init_funcs\n"
+    "\t.p2align 3\n"
+    "\t.quad _last_kernel_constructor\n"
+    "\t.popsection\n");
 
 __asm__(".globl _last_kernel_symbol");
 __asm__(".zerofill __LAST, __last, _last_kernel_symbol, 0");

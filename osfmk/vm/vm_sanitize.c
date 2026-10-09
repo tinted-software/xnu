@@ -632,17 +632,11 @@ vm_sanitize_addr_size(
 	}
 
 	if (flags & VM_SANITIZE_FLAGS_CHECK_ADDR_RANGE) {
-#if defined(__arm64__) && MACH_ASSERT && !__BUILDING_XNU_LIBRARY__
-		/*
-		 * Make sure that this fails noisily if someone adds support for large
-		 * VA extensions. With such extensions, this code will have to check
-		 * ID_AA64MMFR2_EL1 to get the actual max VA size for the system,
-		 * instead of assuming it is 48 bits.
-		 * This is excluded from unit-test build due to being EL1 only instruction
-		 */
-		assert((__builtin_arm_rsr64("ID_AA64MMFR2_EL1") & ID_AA64MMFR2_EL1_VARANGE_MASK) == 0);
-#endif /* defined(__arm64__) && MACH_ASSERT && !__BUILDING_XNU_LIBRARY__ */
+#if defined(__arm64__) && !__BUILDING_XNU_LIBRARY__
+		const uint64_t max_va_bits = ((__builtin_arm_rsr64("ID_AA64MMFR2_EL1") & ID_AA64MMFR2_EL1_VARANGE_MASK) != 0) ? 52 : 48;
+#else
 		const uint64_t max_va_bits = 48;
+#endif
 		const mach_vm_offset_t va_range_upper_bound = (1ULL << max_va_bits);
 		const mach_vm_offset_t va_mask = va_range_upper_bound - 1;
 

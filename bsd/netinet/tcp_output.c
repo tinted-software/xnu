@@ -126,7 +126,7 @@
 #include <netinet/mptcp_seq.h>
 #endif
 
-#include <corecrypto/ccaes.h>
+#include <libkern/crypto/ccmode_abi.h>
 
 #define DBG_LAYER_BEG           NETDBG_CODE(DBG_NETTCP, 1)
 #define DBG_LAYER_END           NETDBG_CODE(DBG_NETTCP, 3)

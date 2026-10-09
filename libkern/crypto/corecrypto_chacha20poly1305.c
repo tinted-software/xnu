@@ -26,7 +26,7 @@
  * @APPLE_OSREFERENCE_LICENSE_HEADER_END@
  */
 
-#include <corecrypto/ccchacha20poly1305.h>
+#include <libkern/crypto/aead_abi.h>
 #include <libkern/crypto/crypto_internal.h>
 #include <libkern/crypto/chacha20poly1305.h>
 

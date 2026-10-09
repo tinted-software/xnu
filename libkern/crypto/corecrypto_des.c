@@ -31,12 +31,18 @@
 #include <libkern/libkern.h>
 #include <kern/debug.h>
 #include <libkern/crypto/des.h>
-#include <corecrypto/ccmode.h>
+#include <libkern/crypto/ccmode_abi.h>
 
 /* Single DES ECB - used by ipv6 (esp_core.c) */
 int
 des_ecb_key_sched(des_cblock *key, des_ecb_key_schedule *ks)
 {
+	if (!key || !ks) {
+		if (ks) {
+			cc_clear(sizeof(*ks), ks);
+		}
+		return CCMODE_INVALID_INPUT;
+	}
 	const struct ccmode_ecb *enc = g_crypto_funcs->ccdes_ecb_encrypt;
 	const struct ccmode_ecb *dec = g_crypto_funcs->ccdes_ecb_decrypt;
 
@@ -45,22 +51,27 @@ des_ecb_key_sched(des_cblock *key, des_ecb_key_schedule *ks)
 		panic("%s: inconsistent size for DES-ECB context", __FUNCTION__);
 	}
 
-	int rc = enc->init(enc, ks->enc, CCDES_KEY_SIZE, key);
-	if (rc) {
-		return rc;
+	int rc = ccecb_init(enc, ks->enc, CCDES_KEY_SIZE, key);
+	if (rc == 0) {
+		rc = ccecb_init(dec, ks->dec, CCDES_KEY_SIZE, key);
 	}
-
-	return dec->init(dec, ks->dec, CCDES_KEY_SIZE, key);
+	if (rc != 0) {
+		cc_clear(sizeof(*ks), ks);
+	}
+	return rc;
 }
 
 /* Simple des - 1 block */
 int
 des_ecb_encrypt(des_cblock *in, des_cblock *out, des_ecb_key_schedule *ks, int enc)
 {
+	if (!ks || !in || !out) {
+		return CCMODE_INVALID_INPUT;
+	}
 	const struct ccmode_ecb *ecb = enc ? g_crypto_funcs->ccdes_ecb_encrypt : g_crypto_funcs->ccdes_ecb_decrypt;
 	ccecb_ctx *ctx = enc ? ks->enc : ks->dec;
 
-	return ecb->ecb(ctx, 1, in, out);
+	return ccecb_update(ecb, ctx, 1, in, out);
 }
 
 
@@ -68,6 +79,12 @@ des_ecb_encrypt(des_cblock *in, des_cblock *out, des_ecb_key_schedule *ks, int e
 int
 des3_ecb_key_sched(des_cblock *key, des3_ecb_key_schedule *ks)
 {
+	if (!key || !ks) {
+		if (ks) {
+			cc_clear(sizeof(*ks), ks);
+		}
+		return CCMODE_INVALID_INPUT;
+	}
 	const struct ccmode_ecb *enc = g_crypto_funcs->cctdes_ecb_encrypt;
 	const struct ccmode_ecb *dec = g_crypto_funcs->cctdes_ecb_decrypt;
 
@@ -76,22 +93,27 @@ des3_ecb_key_sched(des_cblock *key, des3_ecb_key_schedule *ks)
 		panic("%s: inconsistent size for 3DES-ECB context", __FUNCTION__);
 	}
 
-	int rc = enc->init(enc, ks->enc, CCDES_KEY_SIZE * 3, key);
-	if (rc) {
-		return rc;
+	int rc = ccecb_init(enc, ks->enc, CCDES_KEY_SIZE * 3, key);
+	if (rc == 0) {
+		rc = ccecb_init(dec, ks->dec, CCDES_KEY_SIZE * 3, key);
 	}
-
-	return dec->init(dec, ks->dec, CCDES_KEY_SIZE * 3, key);
+	if (rc != 0) {
+		cc_clear(sizeof(*ks), ks);
+	}
+	return rc;
 }
 
 /* Simple des - 1 block */
 int
 des3_ecb_encrypt(des_cblock *in, des_cblock *out, des3_ecb_key_schedule *ks, int enc)
 {
+	if (!ks || !in || !out) {
+		return CCMODE_INVALID_INPUT;
+	}
 	const struct ccmode_ecb *ecb = enc ? g_crypto_funcs->cctdes_ecb_encrypt : g_crypto_funcs->cctdes_ecb_decrypt;
 	ccecb_ctx *ctx = enc ? ks->enc : ks->dec;
 
-	return ecb->ecb(ctx, 1, in, out);
+	return ccecb_update(ecb, ctx, 1, in, out);
 }
 
 /* Raw key helper functions */

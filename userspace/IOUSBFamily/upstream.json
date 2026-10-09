@@ -1,0 +1,27 @@
+{
+  "project": "IOUSBFamily",
+  "repository": "https://github.com/apple-oss-distributions/IOUSBFamily",
+  "tag": "IOUSBFamily-560.4.2",
+  "commit": "aa1bde6708ab287ab8d5098287a957f5d34df372",
+  "files": [
+    {
+      "path": "include/IOKit/usb/USB.h",
+      "upstream_path": "IOUSBFamily/Headers/USB.h",
+      "upstream_sha256": "10402cccd4bbf9418c7998da58bdf5a39234ce852b83e2a3f1fa44e0dbb77820",
+      "source_encoding": "mac_roman",
+      "vendored_encoding": "utf-8"
+    },
+    {
+      "path": "include/IOKit/usb/USBSpec.h",
+      "upstream_path": "IOUSBFamily/Headers/USBSpec.h",
+      "upstream_sha256": "2a59efd382633784420f67dc3b27174c52359283ab41727f383d0fb765fa61f5",
+      "source_encoding": "mac_roman",
+      "vendored_encoding": "utf-8"
+    }
+  ],
+  "notes": [
+    "The latest OSS tag IOUSBFamily-630.4.5 (1398331b04a6bb9ea9b9f76248b8b584811ebcd0) publishes an empty IOUSBFamily/Headers/USB.h. 560.4.2 is the latest preceding complete header pair.",
+    "Replaces IOUSBFamily-208.4.5 headers; adds SuperSpeed definitions and uses libkern/OSByteOrder.h in userspace. All USB error identifiers used by libsyscall/mach/err_iokit.sub are provided.",
+    "Legacy Mac Roman source comments are losslessly transcoded to UTF-8. Declarations and definitions are unmodified."
+  ]
+}

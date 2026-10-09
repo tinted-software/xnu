@@ -88,7 +88,13 @@
 /* ARM64_TODO: move to higher memory */
 #endif
 #define SHARED_REGION_BASE_ARM64                0x180000000ULL
-#define SHARED_REGION_SIZE_ARM64                0x180000000ULL
+/*
+ * The iOS 27 dyld shared cache spans 0x180000000..0x2FD438000 and dyld may
+ * slide it by up to 512MB (header maxSlide 0x20000000), so the region must
+ * hold ~6.4GiB. 8GiB is the round size covering that; this is derived from
+ * the cache, not taken from a published Apple constant.
+ */
+#define SHARED_REGION_SIZE_ARM64                0x200000000ULL
 #define SHARED_REGION_NESTING_BASE_ARM64        SHARED_REGION_BASE_ARM64
 #define SHARED_REGION_NESTING_SIZE_ARM64        SHARED_REGION_SIZE_ARM64
 #define SHARED_REGION_NESTING_MIN_ARM64         ?

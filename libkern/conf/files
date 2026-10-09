@@ -91,16 +91,20 @@ libkern/zlib/trees.c                                    optional zlibc
 libkern/zlib/uncompr.c                                  optional zlibc
 libkern/zlib/zutil.c                                    optional zlibc
 
-libkern/crypto/register_crypto.c		optional crypto
+libkern/crypto/cc_utils.c			standard
+libkern/crypto/register_crypto.c		standard
+libkern/crypto/ccdigest_rc.c			standard
+libkern/crypto/crypto_selftest.c		standard
 libkern/crypto/corecrypto_sha2.c		standard
-libkern/crypto/corecrypto_sha1.c		optional crypto
-libkern/crypto/corecrypto_md5.c			optional crypto
-libkern/crypto/corecrypto_des.c			optional crypto
-libkern/crypto/corecrypto_aes.c			optional crypto
-libkern/crypto/corecrypto_aesxts.c		optional crypto
-libkern/crypto/corecrypto_rand.c		optional crypto
-libkern/crypto/corecrypto_rsa.c		    optional crypto
-libkern/crypto/corecrypto_chacha20poly1305.c	optional	crypto
+libkern/crypto/corecrypto_sha1.c		standard
+libkern/crypto/corecrypto_md5.c		standard
+libkern/crypto/corecrypto_des.c		standard
+libkern/crypto/corecrypto_aes.c		standard
+libkern/crypto/corecrypto_aesxts.c		standard
+libkern/crypto/corecrypto_rand.c		standard
+libkern/crypto/corecrypto_rsa.c		standard
+libkern/crypto/corecrypto_chacha20poly1305.c	standard
+libkern/crypto/kmod_corecrypto.c		standard
 
 libkern/coretrust/coretrust.c   standard
 

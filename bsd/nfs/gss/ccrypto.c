@@ -27,16 +27,7 @@
  */
 
 #include <libkern/crypto/crypto_internal.h>
-#include <corecrypto/ccaes.h>
-#include <corecrypto/ccdes.h>
-#include <corecrypto/ccpad.h>
-#include <corecrypto/ccsha1.h>
+#include <libkern/crypto/ccmode_abi.h>
+#include <libkern/crypto/ccdigest_abi.h>
 #include <sys/malloc.h>
 
-int corecrypto_available(void);
-
-int
-corecrypto_available(void)
-{
-	return 1;
-}

@@ -68,7 +68,7 @@
 #include <libkern/crypto/sha1.h>
 #include <libkern/crypto/crypto_internal.h>
 #include <os/log.h>
-#include <corecrypto/cc.h>
+#include <libkern/crypto/cc_abi.h>
 #include <net/sockaddr_utils.h>
 #if CONTENT_FILTER
 #include <net/content_filter.h>
