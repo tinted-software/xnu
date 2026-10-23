@@ -674,15 +674,11 @@ sleh_synchronous_sp1(arm_context_t *context, uint64_t esr, vm_offset_t far __unu
 	switch (class) {
 	case ESR_EC_UNCATEGORIZED:
 	{
-#if (DEVELOPMENT || DEBUG)
 		uint32_t instr = *((uint32_t*)get_saved_state_pc(state));
 		if (IS_ARM_GDB_TRAP(instr)) {
 			DebuggerCall(EXC_BREAKPOINT, state);
 		}
 		OS_FALLTHROUGH; // panic if we return from the debugger
-#else
-		panic_with_thread_kernel_state("Unexpected debugger trap while SP1 selected", state);
-#endif /* (DEVELOPMENT || DEBUG) */
 	}
 	default:
 		panic_with_thread_kernel_state("Synchronous exception taken while SP1 selected", state);

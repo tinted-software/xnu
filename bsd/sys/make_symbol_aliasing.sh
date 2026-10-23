@@ -34,7 +34,8 @@ fi
 SDKROOT="$1"
 OUTPUT="$2"
 
-AVAILABILITY_PL="${SDKROOT}/${DRIVERKITROOT}/usr/local/libexec/availability.pl"
+# Buck2 sets FAKEROOT_DIR; the make build resolves it from the SDK root.
+AVAILABILITY_PL="${FAKEROOT_DIR:-$SDKROOT}/usr/local/libexec/availability.pl"
 
 if [ ! -x "${AVAILABILITY_PL}" ] ; then
     echo "Unable to locate ${AVAILABILITY_PL} (or not executable)" >&2

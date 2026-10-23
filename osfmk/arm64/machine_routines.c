@@ -1742,7 +1742,7 @@ ml_processor_register(ml_processor_info_t *in_processor_info,
 	 * To avoid predictable allocation tags, we want to initialize
 	 * RGSR_EL1.SEED as early as possible.  Unfortunately this happens
 	 * too early during secondary CPU startup to safely use the
-	 * corecrypto-backed PRNG.  So the primary CPU will generate
+	 * runtime PRNG.  So the primary CPU will generate
 	 * the seeds on their behalf.
 	 */
 	if (!is_boot_cpu) {
@@ -3384,7 +3384,14 @@ __startup_func
 static void
 ml_unsafe_kernel_text_init(void)
 {
-	/* Grab the values written by iBoot. */
+	/*
+	 * iBoot writes /chosen/kernel-ctrr-to-be-enabled. QEMU/OSS firmware
+	 * does not, and DEVELOPMENT asserts that this flag was initialized
+	 * before the first ml_unsafe_kernel_text() call (sdt_init).
+	 * Missing property means CTRR will not lock text.
+	 */
+	_unsafe_kernel_text_initialized = true;
+	_unsafe_kernel_text = true;
 
 	DTEntry         entry;
 	const void      *value;
@@ -3392,7 +3399,6 @@ ml_unsafe_kernel_text_init(void)
 	if (SecureDTLookupEntry(0, "/chosen", &entry) == kSuccess &&
 	    SecureDTGetProperty(entry, "kernel-ctrr-to-be-enabled", &value, &size) == kSuccess &&
 	    size == sizeof(int)) {
-		_unsafe_kernel_text_initialized = true;
 		_unsafe_kernel_text = (0 == *(const int *)value);
 	}
 }
@@ -3406,3 +3412,15 @@ ml_unsafe_kernel_text(void)
 	return false;
 }
 #endif /* DEVELOPMENT || DEBUG || CONFIG_DTRACE || CONFIG_CSR_FROM_DT */
+
+/*
+ * This SoC (Amlogic S905D2 / G12A) has no Apple-silicon eFuse array to
+ * query. Report "production fused" unconditionally, which disables the
+ * engineering/dev-fused-only diagnostic paths that key off this - the
+ * conservative choice given there is no real fuse state to read.
+ */
+boolean_t
+ml_device_is_prod_fused(void)
+{
+	return TRUE;
+}

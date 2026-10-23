@@ -41,6 +41,9 @@ iokit/Kernel/IOConditionLock.cpp			optional iokitcpp
 #iokit/Kernel/IORuntime.cpp				optional iokitcpp
 iokit/Kernel/IOStartIOKit.cpp				optional iokitcpp
 
+iokit/Kernel/IORTC/IOPL031RTC.cpp			optional iokitcpp
+iokit/Kernel/IORTC/IOPL031RTCBuiltinInfo.c		optional iokitcpp
+
 iokit/Kernel/IODeviceTreeSupport.cpp			optional iokitcpp
 
 iokit/Kernel/IORegistryEntry.cpp			optional iokitcpp

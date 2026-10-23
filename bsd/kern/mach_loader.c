@@ -1340,8 +1340,19 @@ parse_machfile(
 			/* Rosetta runtime allowed */
 #endif /* CONFIG_X86_64_COMPAT */
 		} else {
-			/* Check properties of static executables (disallowed except for development) */
-#if !(DEVELOPMENT || DEBUG)
+			/*
+			 * Check properties of static executables (disallowed except
+			 * for development builds).
+			 *
+			 * XXX: this fork's minimal qemu ramdisk bring-up boots a
+			 * trivial freestanding static (non-PIE, non-dyld-linked)
+			 * process-1 init binary and has no DEVELOPMENT kernel config
+			 * variant that builds cleanly (it pulls in xnupost/test
+			 * infrastructure that isn't wired up), so this restriction is
+			 * relaxed for RELEASE too. Revisit once a real dyld-linked
+			 * userspace exists.
+			 */
+#if !(DEVELOPMENT || DEBUG || 1)
 			return LOAD_FAILURE;
 #endif
 		}

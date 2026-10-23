@@ -622,7 +622,14 @@ static const struct pthread_callbacks_s pthread_callbacks = {
 };
 
 SECURITY_READ_ONLY_LATE(pthread_callbacks_t) pthread_kern = &pthread_callbacks;
-SECURITY_READ_ONLY_LATE(pthread_functions_t) pthread_functions = NULL;
+/*
+ * pthread_functions is written by pthread_kext_register(). On a shipping
+ * system that runs when pthread.kext loads, still before machine_lockdown().
+ * We are statically linked and call pthread_start() from bsd_init(), which is
+ * after machine_lockdown() has made __DATA_CONST read-only. Putting this
+ * pointer in SECURITY_READ_ONLY_LATE therefore data-aborts on the assignment.
+ */
+pthread_functions_t pthread_functions = NULL;
 
 /*
  * pthread_kext_register is called by pthread.kext upon load, it has to provide
@@ -633,6 +640,7 @@ SECURITY_READ_ONLY_LATE(pthread_functions_t) pthread_functions = NULL;
 void
 pthread_kext_register(pthread_functions_t fns, pthread_callbacks_t *callbacks)
 {
+	kprintf("pthread_kext_register: fns=%p callbacks=%p\n", fns, callbacks);
 	if (pthread_functions != NULL) {
 		panic("Re-initialisation of pthread kext callbacks.");
 	}
@@ -646,4 +654,5 @@ pthread_kext_register(pthread_functions_t fns, pthread_callbacks_t *callbacks)
 	if (fns) {
 		pthread_functions = fns;
 	}
+	kprintf("pthread_kext_register: done pthread_functions=%p\n", pthread_functions);
 }

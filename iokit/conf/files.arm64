@@ -6,3 +6,6 @@ iokit/Kernel/IOPMrootDomain.cpp    					optional iokitcpp
 # SMP
 iokit/Kernel/arm/AppleARMSMP.cpp    					optional iokitcpp
 
+# Platform CPU driver for boards without USE_APPLEARMSMP (no AppleARMCPU kext)
+iokit/Kernel/arm/OSSARMCPU.cpp    					optional iokitcpp
+

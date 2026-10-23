@@ -11,7 +11,7 @@
 
 #if !XNU_KERNEL_PRIVATE
 #include <TargetConditionals.h>
-#include <os/availability.h>
+#include <Aavailability.h>
 #endif
 
 #include <os/base.h>

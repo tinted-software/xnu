@@ -92,6 +92,8 @@
 #endif
 #include <kern/smr.h>
 #include <kern/startup.h>
+#include <libkern/OSKextLib.h>
+#include <pexpert/arm64/board_config.h>
 #include <kern/task.h>
 #include <kern/thread.h>
 #include <kern/timer.h>
@@ -861,7 +863,18 @@ kernel_bootstrap_thread(void)
 	csm_initialize_provisioning_profiles();
 #endif
 
-	kernel_bootstrap_log("trust_cache_init");
+	kernel_bootstrap_log("amfi_kext");
+
+	/*
+	 * AMFI provides the trust cache interface. Load its kext before the trust
+	 * cache runtime is initialized: nothing else depends on it, so it would
+	 * not otherwise start before the static trust cache is loaded below.
+	 */
+	if (OSKextLoadKextWithIdentifier("com.apple.driver.AppleMobileFileIntegrity") != kOSReturnSuccess) {
+		panic("unable to load AppleMobileFileIntegrity kext");
+	}
+
+ 	kernel_bootstrap_log("trust_cache_init");
 
 	/* Initialize the runtime for the trust cache interface */
 	trust_cache_runtime_init();
@@ -918,6 +931,7 @@ kernel_bootstrap_thread(void)
 	/*
 	 *	Start the user bootstrap.
 	 */
+	printf("kernel_bootstrap: calling bsd_init...\n");
 #ifdef  MACH_BSD
 	bsd_init();
 #endif
@@ -1143,3 +1157,4 @@ scale_setup(void)
 
 	bsd_scale_setup(scale);
 }
+// qemu-startup-debug-v1

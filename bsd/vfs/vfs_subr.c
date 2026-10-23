@@ -1285,6 +1285,7 @@ vfs_mountroot(void)
 			 *   defaults will have been set, so no reason to bail or care
 			 */
 			vfs_init_io_attributes(rootvp, mp);
+			printf("vfs_mountroot: vfs_init_io_attributes done\n");
 
 			if (mp->mnt_ioflags & MNT_IOFLAGS_FUSION_DRIVE) {
 				root_is_CF_drive = TRUE;
@@ -1316,9 +1317,11 @@ vfs_mountroot(void)
 			 * Probe root file system for additional features.
 			 */
 			(void)VFS_START(mp, 0, ctx);
+			printf("vfs_mountroot: VFS_START done\n");
 
 			VFSATTR_INIT(&vfsattr);
 			VFSATTR_WANTED(&vfsattr, f_capabilities);
+			printf("vfs_mountroot: calling vfs_getattr\n");
 			if (vfs_getattr(mp, &vfsattr, ctx) == 0 &&
 			    VFSATTR_IS_SUPPORTED(&vfsattr, f_capabilities)) {
 				if ((vfsattr.f_capabilities.capabilities[VOL_CAPABILITIES_INTERFACES] & VOL_CAP_INT_EXTENDED_ATTR) &&
@@ -1349,6 +1352,7 @@ vfs_mountroot(void)
 			 * a usecount reference which we want to keep
 			 */
 			vnode_put(rootvp);
+			printf("vfs_mountroot: vnode_put(rootvp) done\n");
 
 #if CONFIG_MACF
 			if ((vfs_flags(mp) & MNT_MULTILABEL) == 0) {

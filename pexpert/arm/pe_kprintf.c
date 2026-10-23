@@ -12,6 +12,9 @@
 #include <kern/simple_lock.h>
 #include <os/log_private.h>
 #include <libkern/section_keywords.h>
+#ifdef __arm64__
+#include <pexpert/arm64/board_config.h>
+#endif
 
 /* Globals */
 typedef void (*PE_kputc_t)(char);
@@ -21,9 +24,14 @@ SECURITY_READ_ONLY_LATE(PE_kputc_t) PE_kputc;
  * disable_serial_output disables kprintf() *and* unbuffered panic output
  * except for SPTM based early panic serial output via `sptm_serial_putc()`.
  */
-SECURITY_READ_ONLY_LATE(bool) disable_serial_output = true;
-// disable_kprintf_output only disables kprintf().
-SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = true;
+#if defined(QEMU)
+	/* QEMU virt has no framebuffer; serial is the only console. */
+	SECURITY_READ_ONLY_LATE(bool) disable_serial_output = false;
+	SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = false;
+#else
+	SECURITY_READ_ONLY_LATE(bool) disable_serial_output = true;
+	SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = true;
+#endif
 // disable_iolog_serial_output only disables IOLog, controlled by
 // SERIALMODE_NO_IOLOG.
 SECURITY_READ_ONLY_LATE(bool) disable_iolog_serial_output = false;
@@ -43,6 +51,9 @@ PE_init_kprintf_config(void)
 
 	if (debug_boot_arg & (DB_KPRT | DB_PRT)) {
 		disable_serial_output = false;
+	}
+	if (debug_boot_arg & DB_KPRT) {
+		disable_kprintf_output = false;
 	}
 
 #if DEBUG

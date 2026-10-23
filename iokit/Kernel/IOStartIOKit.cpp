@@ -72,19 +72,16 @@ SECURITY_READ_ONLY_LATE(static IOPlatformExpertDevice*) gRootNub;
 void
 IOKitInitializeTime( void )
 {
-	mach_timespec_t         t;
-
-	t.tv_sec = 30;
-	t.tv_nsec = 0;
-
-	IOService::waitForService(
-		IOService::resourceMatching("IORTC"), &t );
-#if defined(__i386__) || defined(__x86_64__)
-	IOService::waitForService(
-		IOService::resourceMatching("IONVRAM"), &t );
-#endif
-
+	/*
+	 * Do not waitForService(IORTC) on this board. That path sleeps on
+	 * gNotificationLock until a matched IORTC appears; if IOPL031RTC
+	 * never starts (or the sleep deadline never fires under DEVELOPMENT
+	 * timer/hygiene), bsd_init hangs forever. Calendar init only needs
+	 * PEGetUTCTimeOfDay() via gIOPlatform, which is independent of IORTC.
+	 */
+	kprintf("IOKitInitializeTime: initializing calendar (no IORTC wait)\n");
 	clock_initialize_calendar();
+	kprintf("IOKitInitializeTime: done\n");
 }
 
 void
@@ -179,6 +176,28 @@ StartIOKitMatching(void)
 {
 	SOCD_TRACE_XNU(START_IOKIT, SOCD_TRACE_MODE_NONE);
 	assert(gRootNub != NULL);
+
+	/*
+	 * IOResources is created in IOService::initialize() but only attached to
+	 * the service plane in setPlatform(), which runs when an IOPlatformExpert
+	 * starts. publishResource() / builtin IOResources personalities call
+	 * registerService() before that, which logs "not registry member" and
+	 * returns without matching. Attach now so matching and resource publish
+	 * work independently of platform-expert start order.
+	 */
+	IOService *root = IOService::getServiceRoot();
+	IOService *res = IOService::getResourceService();
+	if (root && res && res->getParentEntry(gIOServicePlane) == NULL) {
+		res->attachToParent(root, gIOServicePlane);
+		kprintf("StartIOKitMatching: attached IOResources to service root\n");
+		/*
+		 * IOResources was registered before it joined the registry, when
+		 * registerService() could not match; register again now so the
+		 * built-in IOResources-provider personalities are matched.
+		 */
+		res->registerService();
+	}
+
 	bool ok = gRootNub->startIOServiceMatching();
 	if (__improbable(!ok)) {
 		panic("Failed to start IOService matching");

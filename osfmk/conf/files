@@ -151,6 +151,7 @@ osfmk/kern/ipc_mig.c			standard
 osfmk/kern/ipc_misc.c			standard
 osfmk/kern/ipc_tt.c			standard
 osfmk/kern/kalloc.c			standard
+osfmk/kern/cxx_runtime_stub.c		standard
 osfmk/kern/kern_apfs_reflock.c          standard
 osfmk/kern/ktrace_background_notify.c	standard
 osfmk/kern/ledger.c			standard

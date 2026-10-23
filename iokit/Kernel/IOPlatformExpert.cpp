@@ -1735,7 +1735,7 @@ IODTPlatformExpert::processTopLevel( IORegistryEntry * rootEntry )
 	}
 
 	publishNVRAM();
-	assert(gIOOptionsEntry != NULL); // subclasses that do their own NVRAM initialization shouldn't be calling this
+	/* QEMU/OSS DTs often have no /options node; createNVRAM() may still fail. */
 	dtNVRAM = gIOOptionsEntry;
 
 	// Publish the cpus.
@@ -2334,6 +2334,103 @@ IOPlatformDevice::getResources( void )
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+#if defined(ARM64_BOARD_CONFIG_QEMU) || defined(ARM64_BOARD_CONFIG_QEMU_ARM64E)
+/*
+ * QEMU's "virt" machine implements PSCI (SMCCC fast calls) on the HVC conduit.
+ * Without a PSCI call nothing resets or powers off the machine, and the
+ * shutdown path times out in IOShutdownNotificationsTimedOut. Only the QEMU
+ * board has this conduit, so the call is compiled into that board only.
+ */
+#define PSCI_FN_SYSTEM_OFF      0x84000008ULL
+#define PSCI_FN_SYSTEM_RESET    0x84000009ULL
+
+static void
+pe_qemu_psci_system(uint64_t fn)
+{
+	register uint64_t x0 __asm__("x0") = fn;
+	/* SMCCC: the callee may clobber x0-x17. */
+	__asm__ volatile ("hvc #0"
+	    : "+r"(x0)
+	    :
+	    : "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10",
+	    "x11", "x12", "x13", "x14", "x15", "x16", "x17", "memory");
+}
+
+/* True if the halt type is handled here; PSCI does not return on success. */
+static bool
+pe_qemu_halt_restart(unsigned int type)
+{
+	switch (type) {
+	case kPEHaltCPU:
+	case kPEUPSDelayHaltCPU:
+		pe_qemu_psci_system(PSCI_FN_SYSTEM_OFF);
+		return true;
+	case kPERestartCPU:
+		pe_qemu_psci_system(PSCI_FN_SYSTEM_RESET);
+		return true;
+	default:
+		return false;
+	}
+}
+#endif /* QEMU boards */
+
+/*********************************************************************
+* AppleARMPE class
+*********************************************************************/
+
+class AppleARMPE : public IODTPlatformExpert {
+	OSDeclareDefaultStructors(AppleARMPE);
+
+public:
+	virtual IOService * probe(IOService * provider, SInt32 * score) APPLE_KEXT_OVERRIDE;
+	virtual bool start(IOService * provider) APPLE_KEXT_OVERRIDE;
+	virtual const char * deleteList(void) APPLE_KEXT_OVERRIDE;
+	virtual const char * excludeList(void) APPLE_KEXT_OVERRIDE;
+#if defined(ARM64_BOARD_CONFIG_QEMU) || defined(ARM64_BOARD_CONFIG_QEMU_ARM64E)
+	virtual int haltRestart(unsigned int type) APPLE_KEXT_OVERRIDE;
+#endif /* QEMU boards */
+};
+
+OSDefineMetaClassAndStructors(AppleARMPE, IODTPlatformExpert);
+
+#if defined(ARM64_BOARD_CONFIG_QEMU) || defined(ARM64_BOARD_CONFIG_QEMU_ARM64E)
+int
+AppleARMPE::haltRestart(unsigned int type)
+{
+	if (pe_qemu_halt_restart(type)) {
+		return -1; /* PSCI returned: the machine did not reset */
+	}
+	return IODTPlatformExpert::haltRestart(type);
+}
+#endif /* QEMU boards */
+
+IOService *
+AppleARMPE::probe(IOService * provider, SInt32 * score)
+{
+	if (!IOPlatformExpert::probe(provider, score)) {
+		return NULL;
+	}
+	return this;
+}
+
+bool
+AppleARMPE::start(IOService * provider)
+{
+	return IODTPlatformExpert::start(provider);
+}
+
+const char *
+AppleARMPE::deleteList(void)
+{
+	return "";
+}
+
+const char *
+AppleARMPE::excludeList(void)
+{
+	return "chosen,memory-map";
+}
+
 /*********************************************************************
 * IOPanicPlatform class
 *
@@ -2366,3 +2463,65 @@ IOPanicPlatform::start(IOService * provider)
 
 	return false;
 }
+
+#if OSS_HARDWARE
+/*********************************************************************
+* IOOSSPlatformExpert class
+*
+* Minimal, embedded platform expert for non-Apple-silicon "OSS_HARDWARE"
+* boards (QEMU, SUPERBIRD, IPAD41, ...). These boot from a bespoke,
+* minimal device tree that does not necessarily satisfy AppleARMPE's
+* IONameMatch("device-tree") requirement, so AppleARMPE may never even
+* become a probe candidate for IOPlatformExpertDevice on these boards.
+*
+* Without any personality able to match, IOPlatformExpertDevice is left
+* with no attached IOPlatformExpert at all: callers such as
+* IOSecureBSDRoot() that legitimately wait on
+* IOService::serviceMatching("IOPlatformExpert") then block for the
+* full timeout waiting for a service that can never appear.
+*
+* This personality matches IOPlatformExpertDevice unconditionally (no
+* IONameMatch) at a score below AppleARMPE's, so any board with a
+* well-formed device tree still prefers AppleARMPE, while OSS_HARDWARE
+* boards always end up with a live, attached, generic IOPlatformExpert.
+*********************************************************************/
+
+class IOOSSPlatformExpert : public IOPlatformExpert {
+	OSDeclareDefaultStructors(IOOSSPlatformExpert);
+
+public:
+	virtual IOService * probe(IOService * provider, SInt32 * score) APPLE_KEXT_OVERRIDE;
+	virtual bool start(IOService * provider) APPLE_KEXT_OVERRIDE;
+#if defined(ARM64_BOARD_CONFIG_QEMU) || defined(ARM64_BOARD_CONFIG_QEMU_ARM64E)
+	virtual int haltRestart(unsigned int type) APPLE_KEXT_OVERRIDE;
+#endif /* QEMU boards */
+};
+
+OSDefineMetaClassAndStructors(IOOSSPlatformExpert, IOPlatformExpert);
+
+IOService *
+IOOSSPlatformExpert::probe(IOService * provider, SInt32 * score)
+{
+	if (!IOPlatformExpert::probe(provider, score)) {
+		return NULL;
+	}
+	return this;
+}
+
+bool
+IOOSSPlatformExpert::start(IOService * provider)
+{
+	return IOPlatformExpert::start(provider);
+}
+
+#if defined(ARM64_BOARD_CONFIG_QEMU) || defined(ARM64_BOARD_CONFIG_QEMU_ARM64E)
+int
+IOOSSPlatformExpert::haltRestart(unsigned int type)
+{
+	if (pe_qemu_halt_restart(type)) {
+		return -1; /* PSCI returned: the machine did not reset */
+	}
+	return IOPlatformExpert::haltRestart(type);
+}
+#endif /* QEMU boards */
+#endif /* OSS_HARDWARE */

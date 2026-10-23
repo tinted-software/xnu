@@ -13,6 +13,7 @@ osfmk/arm/pmap/pmap_data.c		optional nos_arm_pmap
 osfmk/arm/pmap/pmap_iommu.c		optional nos_arm_pmap
 osfmk/arm/pmap/pmap_misc.c		optional nos_arm_pmap
 osfmk/arm/pmap/pmap_ppl_interface.c	optional nos_arm_pmap
+osfmk/arm64/ppl/sart.c			optional nos_arm_pmap
 
 osfmk/arm64/sptm/pmap/pmap.c		optional nos_arm_asm config_sptm
 osfmk/arm64/sptm/pmap/pmap_cs.c		optional nos_arm_asm config_sptm

@@ -155,7 +155,7 @@ endif
 
 # Merge the CTF into the unstripped kernel (Debug Rich Executable)
 $(TARGET)/$(KERNEL_FILE_NAME).unstripped: $(TARGET)/$(KERNEL_FILE_NAME).ctf $(TARGET)/$(KERNEL_FILE_NAME).unstripped.noctf
-	$(_v)$(CP) $(TARGET)/$(KERNEL_FILE_NAME).unstripped.noctf $(TARGET)/$(KERNEL_FILE_NAME).unstripped
+	$(_v)$(CP) -c $(TARGET)/$(KERNEL_FILE_NAME).unstripped.noctf $(TARGET)/$(KERNEL_FILE_NAME).unstripped 2>/dev/null || $(CP) $(TARGET)/$(KERNEL_FILE_NAME).unstripped.noctf $(TARGET)/$(KERNEL_FILE_NAME).unstripped
 	$(_v)$(RM) $@.ctfdata
 ifeq ($(DO_CTFMERGE),1)
 	@$(LOG_CTFMERGE) "$(@F)"

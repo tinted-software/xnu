@@ -32,6 +32,7 @@
 #include <pexpert/pexpert.h>
 #include <libkern/section_keywords.h>
 #include <libkern/kernel_mach_header.h>
+#include <libkern/prelink.h>
 
 vm_offset_t kc_highest_nonlinkedit_vmaddr = 0;
 int vnode_put(void *vp);
@@ -200,7 +201,22 @@ PE_get_primary_kc_format(kc_format_t *type)
 			if (static_kernelcache) {
 				*type = KCFormatStatic;
 			} else {
-				*type = KCFormatKCGEN;
+				/*
+				 * KCGEN walks __PRELINK_TEXT for prelinked
+				 * kexts. A standalone MH_EXECUTE (QEMU / u-boot
+				 * bootxnu) has no such segment; treating it as
+				 * KCGEN then NULL-derefs the missing section
+				 * during kalloc_init.
+				 */
+				extern kernel_mach_header_t _mh_execute_header;
+				kernel_section_t *prelink = getsectbynamefromheader(
+				    &_mh_execute_header, kPrelinkTextSegment,
+				    kPrelinkTextSection);
+				if (prelink == NULL || prelink->size == 0) {
+					*type = KCFormatStatic;
+				} else {
+					*type = KCFormatKCGEN;
+				}
 			}
 #else
 			*type = KCFormatDynamic;

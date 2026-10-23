@@ -1105,7 +1105,9 @@ kalloc_type_view_parse(const kalloc_type_variant_t type)
 		 */
 		kernel_section_t *prelink_sect = getsectbynamefromheader(
 			xnu_mh, kPrelinkTextSegment, kPrelinkTextSection);
-		assert(prelink_sect);
+		if (prelink_sect == NULL || prelink_sect->size == 0) {
+			return cur_count;
+		}
 		cur = prelink_sect->addr;
 		end = prelink_sect->addr + prelink_sect->size;
 

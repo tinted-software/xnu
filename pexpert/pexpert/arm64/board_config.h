@@ -319,6 +319,83 @@
 #endif  /* ARM64_BOARD_CONFIG_VMAPPLE */
 
 
+#ifdef ARM64_BOARD_CONFIG_SUPERBIRD
+#include <pexpert/arm64/SUPERBIRD.h>
+
+#define MAX_L2_CLINE                   6  /* Cortex-A53: 64-byte L2 lines */
+#define MAX_CPUS                       1  /* v1: boot single-core; no PSCI SMP bring-up in xnu yet */
+#define MAX_CPU_CLUSTERS               1
+
+/*
+ * Do NOT define USE_APPLEARMSMP: that path drives Apple's proprietary
+ * CPU_OVRD/ACC power-manager registers, which don't exist on this SoC.
+ * Secondary cores are left parked (never issue PSCI CPU_ON).
+ */
+#define NO_CPU_OVRD                    1 /* CPU_OVRD register accesses are banned - no such register here */
+
+#define NO_XNU_PLATFORM_ERROR_HANDLER  1
+
+#endif  /* ARM64_BOARD_CONFIG_SUPERBIRD */
+#ifdef ARM64_BOARD_CONFIG_IPAD41
+#include <pexpert/arm64/IPAD41.h>
+
+#define MAX_L2_CLINE                   6  /* Cyclone: 64-byte L2 lines */
+#define MAX_CPUS                       1  /* v1: boot CPU only; A7 dual-core bring-up TBD */
+#define MAX_CPU_CLUSTERS               1
+
+/* Same rationale as SUPERBIRD: no Apple CPU_OVRD/ACC power-manager
+ * registers are driven by this port. */
+#define NO_CPU_OVRD                    1
+
+#define NO_XNU_PLATFORM_ERROR_HANDLER  1
+
+#endif  /* ARM64_BOARD_CONFIG_IPAD41 */
+
+#ifdef ARM64_BOARD_CONFIG_QEMU
+#include <pexpert/arm64/QEMU.h>
+
+#define MAX_L2_CLINE                   6  /* Cortex-A53: 64-byte L2 lines */
+#define MAX_CPUS                       1  /* v1: boot single-core; no PSCI SMP bring-up in xnu yet */
+#define MAX_CPU_CLUSTERS               1
+
+/* Same rationale as SUPERBIRD: no Apple CPU_OVRD/ACC power-manager
+ * registers exist on QEMU's `virt` machine either. */
+#define NO_CPU_OVRD                    1
+
+#define NO_XNU_PLATFORM_ERROR_HANDLER  1
+
+#endif  /* ARM64_BOARD_CONFIG_QEMU */
+
+#ifdef ARM64_BOARD_CONFIG_QEMU_ARM64E
+#include <pexpert/arm64/QEMU_ARM64E.h>
+
+#define MAX_L2_CLINE                   6  /* `-cpu max`: 64-byte L2 lines */
+#define MAX_CPUS                       1  /* v1: boot single-core; no PSCI SMP bring-up in xnu yet */
+#define MAX_CPU_CLUSTERS               1
+
+/* Same rationale as SUPERBIRD: no Apple CPU_OVRD/ACC power-manager
+ * registers exist on QEMU's `virt` machine either. */
+#define NO_CPU_OVRD                    1
+
+#define NO_XNU_PLATFORM_ERROR_HANDLER  1
+
+#endif  /* ARM64_BOARD_CONFIG_QEMU_ARM64E */
+
+#ifdef ARM64_BOARD_CONFIG_QEMU_A55
+#include <pexpert/arm64/QEMU_A55.h>
+
+#define MAX_L2_CLINE                   6  /* Cortex-A55: 64-byte L2 lines */
+#define MAX_CPUS                       1  /* v1: boot single-core; no PSCI SMP bring-up in xnu yet */
+#define MAX_CPU_CLUSTERS               1
+
+/* No Apple CPU_OVRD/ACC power-manager registers on QEMU's virt machine. */
+#define NO_CPU_OVRD                    1
+
+#define NO_XNU_PLATFORM_ERROR_HANDLER  1
+
+#endif  /* ARM64_BOARD_CONFIG_QEMU_A55 */
+
+
 
 #ifndef HAS_UNCORE_CTRS
 #undef UNCORE_VERSION

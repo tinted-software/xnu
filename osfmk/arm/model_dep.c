@@ -734,27 +734,29 @@ do_print_all_panic_info(const char *message, uint64_t panic_options, const char 
 		kext_dump_panic_lists(&paniclog_append_noflush);
 		paniclog_append_noflush("\n");
 	}
-	panic_info->eph_panic_log_len = PE_get_offset_into_panic_region(debug_buf_ptr) - panic_info->eph_panic_log_offset;
-	/* set the os version data in the panic header in the format 'Product Version (OS Version)' (only if they have been set) */
-	if ((osversion[0] != '\0') && (osproductversion[0] != '\0')) {
-		snprintf((char *)&panic_info->eph_os_version, sizeof(panic_info->eph_os_version), PANIC_HEADER_VERSION_FMT_STR,
-		    osproductversion, osversion);
-	}
+	if (panic_info) {
+		panic_info->eph_panic_log_len = PE_get_offset_into_panic_region(debug_buf_ptr) - panic_info->eph_panic_log_offset;
+		/* set the os version data in the panic header in the format 'Product Version (OS Version)' (only if they have been set) */
+		if ((osversion[0] != '\0') && (osproductversion[0] != '\0')) {
+			snprintf((char *)&panic_info->eph_os_version, sizeof(panic_info->eph_os_version), PANIC_HEADER_VERSION_FMT_STR,
+			    osproductversion, osversion);
+		}
 #if defined(XNU_TARGET_OS_BRIDGE)
-	if ((macosversion[0] != '\0') && (macosproductversion[0] != '\0')) {
-		snprintf((char *)&panic_info->eph_macos_version, sizeof(panic_info->eph_macos_version), PANIC_HEADER_VERSION_FMT_STR,
-		    macosproductversion, macosversion);
-	}
+		if ((macosversion[0] != '\0') && (macosproductversion[0] != '\0')) {
+			snprintf((char *)&panic_info->eph_macos_version, sizeof(panic_info->eph_macos_version), PANIC_HEADER_VERSION_FMT_STR,
+			    macosproductversion, macosversion);
+		}
 #endif
-	if (bootsessionuuid_string[0] != '\0') {
-		memcpy(panic_info->eph_bootsessionuuid_string, bootsessionuuid_string,
-		    sizeof(panic_info->eph_bootsessionuuid_string));
-	}
-	panic_info->eph_roots_installed = roots_installed;
+		if (bootsessionuuid_string[0] != '\0') {
+			memcpy(panic_info->eph_bootsessionuuid_string, bootsessionuuid_string,
+			    sizeof(panic_info->eph_bootsessionuuid_string));
+		}
+		panic_info->eph_roots_installed = roots_installed;
 
-	/* Copy device-specific target and model type buffers */
-	memcpy(panic_info->eph_device_target_type, gUniqueDeviceTargetTypeBuffer, sizeof(panic_info->eph_device_target_type));
-	memcpy(panic_info->eph_device_model_type, gUniqueDeviceModelTypeBuffer, sizeof(panic_info->eph_device_model_type));
+		/* Copy device-specific target and model type buffers */
+		memcpy(panic_info->eph_device_target_type, gUniqueDeviceTargetTypeBuffer, sizeof(panic_info->eph_device_target_type));
+		memcpy(panic_info->eph_device_model_type, gUniqueDeviceModelTypeBuffer, sizeof(panic_info->eph_device_model_type));
+	}
 
 	if (panic_initiator != NULL) {
 		bytes_remaining = debug_buf_size - (unsigned int)((uintptr_t)debug_buf_ptr - (uintptr_t)debug_buf_base);
@@ -762,21 +764,27 @@ do_print_all_panic_info(const char *message, uint64_t panic_options, const char 
 		panic_initiator_len = strnlen(panic_initiator, MAX_PANIC_INITIATOR_SIZE);
 		// Calculate the bytes to write, accounting for remaining buffer space, and ensuring the lowest size we can have is 0
 		panic_initiator_len = MAX(0, MIN(panic_initiator_len, bytes_remaining));
-		panic_info->eph_panic_initiator_offset = (panic_initiator_len != 0) ? PE_get_offset_into_panic_region(debug_buf_ptr) : 0;
-		panic_info->eph_panic_initiator_len = panic_initiator_len;
+		if (panic_info) {
+			panic_info->eph_panic_initiator_offset = (panic_initiator_len != 0) ? PE_get_offset_into_panic_region(debug_buf_ptr) : 0;
+			panic_info->eph_panic_initiator_len = panic_initiator_len;
+		}
 		memcpy(debug_buf_ptr, panic_initiator, panic_initiator_len);
 		debug_buf_ptr += panic_initiator_len;
 	}
 
 	if (debug_ack_timeout_count) {
-		panic_info->eph_panic_flags |= EMBEDDED_PANIC_HEADER_FLAG_STACKSHOT_FAILED_DEBUGGERSYNC;
-		panic_info->eph_other_log_offset = PE_get_offset_into_panic_region(debug_buf_ptr);
+		if (panic_info) {
+			panic_info->eph_panic_flags |= EMBEDDED_PANIC_HEADER_FLAG_STACKSHOT_FAILED_DEBUGGERSYNC;
+			panic_info->eph_other_log_offset = PE_get_offset_into_panic_region(debug_buf_ptr);
+		}
 		paniclog_append_noflush("!! debugger synchronization failed, no stackshot !!\n");
 	} else if (panic_stackshot_active()) {
-		panic_info->eph_panic_flags |= EMBEDDED_PANIC_HEADER_FLAG_STACKSHOT_FAILED_NESTED;
-		panic_info->eph_other_log_offset = PE_get_offset_into_panic_region(debug_buf_ptr);
+		if (panic_info) {
+			panic_info->eph_panic_flags |= EMBEDDED_PANIC_HEADER_FLAG_STACKSHOT_FAILED_NESTED;
+			panic_info->eph_other_log_offset = PE_get_offset_into_panic_region(debug_buf_ptr);
+		}
 		paniclog_append_noflush("!! panicked during stackshot, skipping panic stackshot !!\n");
-	} else {
+	} else if (panic_info && debug_buf_base && debug_buf_size > 0) {
 		/* Align the stackshot buffer to an 8-byte address (especially important for armv7k devices) */
 		debug_buf_ptr += (8 - ((uintptr_t)debug_buf_ptr % 8));
 		stackshot_begin_loc = debug_buf_ptr;
@@ -849,15 +857,19 @@ do_print_all_panic_info(const char *message, uint64_t panic_options, const char 
 	}
 
 #if CONFIG_EXT_PANICLOG
-	// Write ext paniclog at the end of the paniclog region.
-	ext_paniclog_bytes = ext_paniclog_write_panicdata();
-	panic_info->eph_ext_paniclog_offset = (ext_paniclog_bytes != 0) ?
-	    PE_get_offset_into_panic_region((debug_buf_base + debug_buf_size) - ext_paniclog_bytes) :
-	    0;
-	panic_info->eph_ext_paniclog_len = ext_paniclog_bytes;
+	if (panic_info) {
+		// Write ext paniclog at the end of the paniclog region.
+		ext_paniclog_bytes = ext_paniclog_write_panicdata();
+		panic_info->eph_ext_paniclog_offset = (ext_paniclog_bytes != 0) ?
+		    PE_get_offset_into_panic_region((debug_buf_base + debug_buf_size) - ext_paniclog_bytes) :
+		    0;
+		panic_info->eph_ext_paniclog_len = ext_paniclog_bytes;
+	}
 #endif
 
-	assert(panic_info->eph_other_log_offset != 0);
+	if (panic_info) {
+		assert(panic_info->eph_other_log_offset != 0);
+	}
 
 	if (print_vnodes != 0) {
 		panic_print_vnodes();
@@ -939,19 +951,10 @@ void
 SavePanicInfo(
 	const char *message, __unused void *panic_data, uint64_t panic_options, const char* panic_initiator)
 {
-	/*
-	 * This should be initialized by the time we get here, but
-	 * if it is not, asserting about it will be of no use (it will
-	 * come right back to here), so just loop right here and now.
-	 * This prevents early-boot panics from becoming recursive and
-	 * thus makes them easier to debug. If you attached to a device
-	 * and see your PC here, look down a few frames to see your
-	 * early-boot panic there.
-	 */
-	while (!panic_info || panic_info->eph_panic_log_offset == 0) {
-		// rdar://87170225 (PanicHardening: audit panic code for naked spinloops)
-		// rdar://88094367 (Add test hooks for panic at different stages in XNU)
-		;
+	if (!panic_info || panic_info->eph_panic_log_offset == 0) {
+		print_all_panic_info(message, panic_options, panic_initiator);
+		panic_spin_forever();
+		return;
 	}
 
 	if (panic_options & DEBUGGER_OPTION_PANICLOGANDREBOOT) {
@@ -1019,10 +1022,9 @@ paniclog_flush()
 		return;
 	}
 
-	/*
-	 * Updates the log length of the last part of the panic log.
-	 */
-	panic_info->eph_other_log_len = PE_get_offset_into_panic_region(debug_buf_ptr) - panic_info->eph_other_log_offset;
+	if (panic_info) {
+		panic_info->eph_other_log_len = PE_get_offset_into_panic_region(debug_buf_ptr) - panic_info->eph_other_log_offset;
+	}
 
 	/*
 	 * Updates the metadata at the beginning of the panic buffer,

@@ -1870,8 +1870,13 @@ vm_shared_region_map_file_setup(
 				 * Record the lowest writable address in this
 				 * sub map, to log any unexpected unnesting below
 				 * that address (see log_unnest_badness()).
+				 * A mapping that can become writable counts, not only
+				 * one that starts out writable: the cache's TPRO/auth
+				 * sections are mapped read-only with a writable max
+				 * protection, and the kernel itself remaps them per
+				 * task (vm_shared_region_auth_remap()), which unnests them.
 				 */
-				if ((mappings[i].sms_init_prot & VM_PROT_WRITE) &&
+				if (((mappings[i].sms_init_prot | mappings[i].sms_max_prot) & VM_PROT_WRITE) &&
 				    sr_map->is_nested_map &&
 				    (lowest_unnestable_addr == 0 ||
 				    (target_address < lowest_unnestable_addr))) {

@@ -167,7 +167,18 @@ ZONE_DEFINE_TYPE(percpu_u64_zone, "percpu.64", uint64_t,
 #define ZONE_MAX_CHUNK_ALLOC_NUM        (10)
 #endif /* ZSECURITY_CONFIG(SAD_FENG_SHUI) */
 
-#if   XNU_PLATFORM_MacOSX
+#if defined(ARM64_BOARD_CONFIG_QEMU) || defined(ARM64_BOARD_CONFIG_QEMU_ARM64E)
+/*
+ * QEMU virt is compiled with XNU_PLATFORM_MacOSX, whose default zone
+ * map is 128GB of VA. The 4K-page ARM64 kernel window is only 112GB
+ * (VM_MIN 0xffffffe000000000 .. VM_MAX 0xfffffffbffffffff) and after
+ * pmap_virtual_region reservations the remaining hole is ~28GB.
+ * kmem_add_extra_claims() then underflows free_size and panics in
+ * kmem_range_init with a nonsense kmem_ptr_range_0 size.
+ */
+#define ZONE_MAP_MAX            (2ULL << 30)
+#define ZONE_MAP_VA_SIZE        (8ULL << 30)
+#elif   XNU_PLATFORM_MacOSX
 #define ZONE_MAP_MAX            (32ULL << 30)
 #define ZONE_MAP_VA_SIZE        (128ULL << 30)
 #else

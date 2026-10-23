@@ -51,3 +51,28 @@ pmap_abandon_measurement(void)
 	pmap_interrupts_restore(istate);
 #endif /* SCHED_HYGIENE_DEBUG */
 }
+
+#if SCHED_HYGIENE_DEBUG && (DEBUG || DEVELOPMENT)
+bool
+pmap_pending_preemption(void)
+{
+	return _pmap_pending_preemption_real();
+}
+#endif /* SCHED_HYGIENE_DEBUG && (DEBUG || DEVELOPMENT) */
+
+/*
+ * PPL code-signing configuration.  arm64 builds normally get these from
+ * the KDK's prebuilt pmap; this tree builds the pmap from source, and the
+ * OSS hardware platforms have no PPL/IOMMU, so report the "no PPL" values.
+ */
+int
+pmap_cs_configuration(void)
+{
+	return 0;
+}
+
+bool
+pmap_has_iofilter_protected_write(void)
+{
+	return false;
+}

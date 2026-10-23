@@ -355,6 +355,27 @@ LEXT(CleanPoC_DcacheRegion_Force)
 #endif /* APPLE_ARM64_ARCH_FAMILY */
 
 /*
+ *	void CleanPoC_DcacheRegion_Force_nopreempt(vm_offset_t va, size_t length)
+ *
+ *		Same as CleanPoC_DcacheRegion_Force, but callable when preemption
+ *		is already disabled by the caller. On APPLE_ARM64_ARCH_FAMILY
+ *		this is the (disable/enable-preemption-free) callee of
+ *		CleanPoC_DcacheRegion_Force above; non-Apple-silicon platforms
+ *		have no such split fast path, so this open-source drop never
+ *		defines it for them even though osfmk/arm/pmap/pmap.c calls it
+ *		directly on every architecture. The portable
+ *		CleanPoC_DcacheRegion_internal path doesn't touch preemption
+ *		state either way, so it serves both variants identically.
+ */
+	.text
+	.align 2
+#if !defined(APPLE_ARM64_ARCH_FAMILY)
+	.globl EXT(CleanPoC_DcacheRegion_Force_nopreempt)
+LEXT(CleanPoC_DcacheRegion_Force_nopreempt)
+	ARM64_PROLOG
+	b		EXT(CleanPoC_DcacheRegion_internal)
+#endif /* !APPLE_ARM64_ARCH_FAMILY */
+/*
  *	void FlushPoC_Dcache(void)
  *
  *		Clean and Invalidate dcaches to Point of Coherency

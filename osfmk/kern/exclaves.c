@@ -3328,7 +3328,7 @@ STARTUP(TUNABLES, STARTUP_RANK_MIDDLE, exclaves_requirement_startup);
 
 #endif /* CONFIG_EXCLAVES */
 
-#if __has_include(<Tightbeam/tightbeam.h>)
+#if __has_include(<Tightbeam/tightbeam.h>) && !OSS_HARDWARE
 
 #include <Tightbeam/tightbeam.h>
 

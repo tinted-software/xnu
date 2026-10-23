@@ -251,6 +251,27 @@
 /* D-Cache. */
 #define MMU_CLINE   6
 
+#elif defined (SUPERBIRD)
+
+/* Cortex-A53: 32KB 2-way I-cache, 32KB 4-way D-cache, 64-byte lines. */
+#define MMU_I_CLINE 6
+
+#define MMU_CLINE   6
+
+#elif defined (QEMU)
+
+/* Cortex-A53 (QEMU virt -cpu cortex-a53): 32KB 2-way I-cache, 32KB 4-way
+ * D-cache, 64-byte lines - same geometry as SUPERBIRD's real A53. */
+#define MMU_I_CLINE 6
+
+#define MMU_CLINE   6
+#elif defined (APPLECYCLONE)
+
+/* Cyclone (A7): 64KB 4-way I-cache, 64KB 4-way D-cache, 64-byte lines. */
+#define MMU_I_CLINE 6
+
+#define MMU_CLINE   6
+
 #else
 #error processor not supported
 #endif
@@ -704,6 +725,14 @@
 // 0     M              MMU enable
 #define SCTLR_M_ENABLED           (1ULL << 0)
 
+// 23    SPAN  Set Privileged Access Never on exception entry (RES1 before Armv8.1).
+// Without PAN support in the kernel, hardware must not set PAN on exception entry.
+#if __ARM_PAN_AVAILABLE__
+#define SCTLR_SPAN_DEFAULT        0
+#else
+#define SCTLR_SPAN_DEFAULT        (1ULL << 23)
+#endif
+
 #if APPLEVIRTUALPLATFORM
 #define SCTLR_EPAN_DEFAULT        0
 /* xnu tries to set SCTLR_EL1.EPAN = 1, but it may be RaZ/WI on some hosts */
@@ -756,7 +785,7 @@
 	 SCTLR_I_ENABLED | SCTLR_SED_DISABLED | SCTLR_CP15BEN_ENABLED | SCTLR_BT_DEFAULT | \
 	 SCTLR_SA0_ENABLED | SCTLR_SA_ENABLED | SCTLR_C_ENABLED | SCTLR_M_ENABLED |        \
 	 SCTLR_EPAN_DEFAULT | SCTLR_EIS_DEFAULT | SCTLR_EOS_DEFAULT | SCTLR_DSSBS_DEFAULT | \
-	 SCTLR_PAC_KEYS_DEFAULT | SCTLR_TP2_DEFAULT | SCTLR_OTHER)
+	 SCTLR_PAC_KEYS_DEFAULT | SCTLR_TP2_DEFAULT | SCTLR_SPAN_DEFAULT | SCTLR_OTHER)
 
 #define SCTLR_EL1_OPTIONAL \
 	(SCTLR_EPAN_OPTIONAL)
@@ -1973,7 +2002,6 @@
 #define ARM_4K_TT_L3_OFFMASK    0x0000000000000fffULL /* offset within L3 PTE */
 #define ARM_4K_TT_L3_SHIFT      12                    /* page descriptor shift */
 #define ARM_4K_TT_L3_INDEX_MASK 0x00000000001ff000ULL /* mask for page descriptor index */
-
 #ifdef __ARM_16K_PG__
 
 /* Native L0 defines */

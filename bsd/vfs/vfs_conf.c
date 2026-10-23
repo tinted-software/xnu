@@ -98,10 +98,14 @@ extern  const struct vfsops routefs_vfsops;
 extern  struct vfsops nullfs_vfsops;
 extern struct vfsops bindfs_vfsops;
 
-#if MOCKFS
-extern  struct vfsops mockfs_vfsops;
-extern  int mockfs_mountroot(mount_t, vnode_t, vfs_context_t);
-#endif /* MOCKFS */
+#if APFSRO
+extern  const struct vfsops apfsro_vfsops;
+extern  int apfsro_mountroot(mount_t, vnode_t, vfs_context_t);
+#endif /* APFSRO */
+#if TMPFS
+extern  const struct vfsops tmpfs_vfsops;
+extern  const struct vnodeopv_desc tmpfs_vnodeop_opv_desc;
+#endif /* TMPFS */
 
 enum fs_type_num {
 	FT_DEVFS = 19,
@@ -109,10 +113,11 @@ enum fs_type_num {
 	FT_ROUTEFS = 21,
 	FT_NULLFS = 22,
 	FT_BINDFS = 23,
-	FT_MOCKFS  = 0x6D6F636B
+	FT_APFSRO  = 0x6170726F,
+	FT_TMPFS   = 24
 };
 
-int fstypenumstart = FT_BINDFS + 1;
+int fstypenumstart = FT_TMPFS + 1;
 /*
  * Set up the filesystem operations for vnodes.
  */
@@ -193,27 +198,27 @@ static struct vfstable vfstbllist[] = {
 	},
 #endif /* BINDFS */
 
-#if MOCKFS
-	/* If we are configured for it, mockfs should always be the last standard entry (and thus the last FS we attempt mountroot with) */
+#if APFSRO
+	/* If we are configured for it, apfsro should always be the last standard entry (and thus the last FS we attempt mountroot with) */
 	{
-		.vfc_vfsops = &mockfs_vfsops,
-		.vfc_name = "mockfs",
-		.vfc_typenum = FT_MOCKFS,
+		.vfc_vfsops = &apfsro_vfsops,
+		.vfc_name = "apfs",
+		.vfc_typenum = FT_APFSRO,
 		.vfc_refcount = 0,
 		.vfc_flags = MNT_LOCAL,
-		.vfc_mountroot = mockfs_mountroot,
+		.vfc_mountroot = apfsro_mountroot,
 		.vfc_next = NULL,
 		.vfc_reserved1 = 0,
 		.vfc_reserved2 = 0,
-		.vfc_vfsflags = VFC_VFSGENERICARGS,
+		.vfc_vfsflags = VFC_VFSGENERICARGS | VFC_VFS64BITREADY,
 		.vfc_descptr = NULL,
 		.vfc_descsize = 0,
 		.vfc_sysctl = NULL
 	},
-#endif /* MOCKFS */
+#endif /* APFSRO */
 
 #if ROUTEFS
-	/* If we are configured for it, mockfs should always be the last standard entry (and thus the last FS we attempt mountroot with) */
+	/* If we are configured for it, routefs is an entry without a mountroot routine */
 	{
 		.vfc_vfsops = &routefs_vfsops,
 		.vfc_name = "routefs",
@@ -230,6 +235,24 @@ static struct vfstable vfstbllist[] = {
 		.vfc_sysctl = NULL
 	},
 #endif /* ROUTEFS */
+#if TMPFS
+	{
+		.vfc_vfsops = &tmpfs_vfsops,
+		.vfc_name = "tmpfs",
+		.vfc_typenum = FT_TMPFS,
+		.vfc_refcount = 0,
+		.vfc_flags = MNT_LOCAL,
+		.vfc_mountroot = NULL,
+		.vfc_next = NULL,
+		.vfc_reserved1 = 0,
+		.vfc_reserved2 = 0,
+		.vfc_vfsflags = VFC_VFSGENERICARGS | VFC_VFS64BITREADY,
+		.vfc_descptr = NULL,
+		.vfc_descsize = 0,
+		.vfc_sysctl = NULL
+	},
+#endif /* TMPFS */
+
 
 	{
 		.vfc_vfsops = NULL,
@@ -293,9 +316,9 @@ extern struct vnodeopv_desc devfs_devfd_vnodeop_opv_desc;
 extern const struct vnodeopv_desc devfs_fdesc_vnodeop_opv_desc;
 #endif /* FDESC */
 
-#if MOCKFS
-extern const struct vnodeopv_desc mockfs_vnodeop_opv_desc;
-#endif /* MOCKFS */
+#if APFSRO
+extern const struct vnodeopv_desc apfsro_vnodeop_opv_desc;
+#endif /* APFSRO */
 
 extern const struct vnodeopv_desc nullfs_vnodeop_opv_desc;
 extern const struct vnodeopv_desc bindfs_vnodeop_opv_desc;
@@ -323,8 +346,11 @@ const struct vnodeopv_desc *vfs_opv_descs[] = {
 #if BINDFS
 	&bindfs_vnodeop_opv_desc,
 #endif /* BINDFS */
-#if MOCKFS
-	&mockfs_vnodeop_opv_desc,
-#endif /* MOCKFS */
+#if APFSRO
+	&apfsro_vnodeop_opv_desc,
+#endif /* APFSRO */
+#if TMPFS
+	&tmpfs_vnodeop_opv_desc,
+#endif /* TMPFS */
 	NULL
 };

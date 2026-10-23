@@ -41,7 +41,7 @@ struct tty     *km_tty[1] = { 0 };
 /*
  * 'Global' variables, shared only by this file and kmDevice.m.
  */
-int             initialized = 0;
+static int      initialized = 0;
 
 static int      kmoutput(struct tty * tp);
 static void     kmstart(struct tty * tp);

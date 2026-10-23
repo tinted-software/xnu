@@ -859,9 +859,9 @@ extern lck_grp_t pmap_lck_grp;
 extern lck_attr_t pmap_lck_rw_attr;
 
 extern void CleanPoC_DcacheRegion_Force_nopreempt_nohid(vm_offset_t va, size_t length);
+extern void CleanPoC_DcacheRegion_Force_nopreempt(vm_offset_t va, size_t length);
 
 #if XNU_MONITOR
-extern void CleanPoC_DcacheRegion_Force_nopreempt(vm_offset_t va, size_t length);
 #define pmap_force_dcache_clean(va, sz) CleanPoC_DcacheRegion_Force_nopreempt(va, sz)
 #define pmap_simple_lock(l)             simple_lock_nopreempt(l, &pmap_lck_grp)
 #define pmap_simple_unlock(l)           simple_unlock_nopreempt(l)

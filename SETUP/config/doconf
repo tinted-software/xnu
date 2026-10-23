@@ -163,6 +163,9 @@ while ($#argv >= 1)
 	case "-tag":
 	    set DEF_TAG="-DMASTER_CONFIG_ENABLE_KERNEL_TAG"
 	    breaksw
+	case "-osshw":
+	    set DEF_OSSHW="-DMASTER_CONFIG_OSS_HARDWARE"
+	    breaksw
 	default:
 	    echo "${prog}: ${argv[1]}: unknown switch"
 	    exit 1
@@ -209,7 +212,7 @@ foreach SYS ($argv)
     cat $MASTER $MASTER_CPU - \
         $MASTER $MASTER_CPU \
     | \
-    unifdef -t -DPLATFORM_${PLATFORM} -DCPU_$cpu -DSOC_CONFIG_${SOC_CONFIG} -DSYS_${SYS} $DEF_AVP $DEF_SEED $DEF_EXCLAVES $DEF_SPTM $DEF_BUILD $DEF_TAG - \
+    unifdef -t -DPLATFORM_${PLATFORM} -DCPU_$cpu -DSOC_CONFIG_${SOC_CONFIG} -DSYS_${SYS} $DEF_AVP $DEF_SEED $DEF_EXCLAVES $DEF_SPTM $DEF_BUILD $DEF_TAG $DEF_OSSHW - \
     | \
     sed -n \
 	-e "/^+/{" \

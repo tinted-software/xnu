@@ -479,6 +479,26 @@ pvh_ptep_is_iommu(const pt_entry_t *ptep)
 }
 
 /**
+ * Given a page table entry pointer retrieved from the pv_head_table that is
+ * known to be an IOMMU mapping (pvh_ptep_is_iommu() returned true), return
+ * an opaque identifier for the owning IOMMU. This is diagnostic-only (used
+ * to format panic() messages) and carries no control-flow significance.
+ *
+ * @param ptep A PTE pointer obtained from the pv_head_table.
+ *
+ * @return An opaque, non-dereferencable identifier suitable for %p.
+ */
+static inline const void *
+ptep_get_iommu(const pt_entry_t *ptep)
+{
+#ifdef PVH_FLAG_IOMMU
+	return (const void *)((vm_offset_t)ptep & ~PVH_FLAG_IOMMU);
+#else /* PVH_FLAG_IOMMU */
+	return ptep;
+#endif /* PVH_FLAG_IOMMU */
+}
+
+/**
  * Sometimes the PTE pointers retrieved from the pv_head_table (from an entry of
  * type PVH_TYPE_PTEP or PVH_TYPE_PVEP) contain flags themselves. This function
  * strips out those flags and returns back a dereferencable pointer.

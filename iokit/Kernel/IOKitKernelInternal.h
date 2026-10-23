@@ -241,6 +241,10 @@ extern const  OSSymbol * gAKSGetKey;
 void IOScreenLockTimeUpdate(clock_sec_t secs);
 
 void     IOCPUInitialize(void);
+#if defined(__arm64__) && !USE_APPLEARMSMP
+/* iokit/Kernel/arm/OSSARMCPU.cpp - stand-in for the AppleARMCPU kext. */
+void     oss_arm_cpu_initialize(void);
+#endif
 IOReturn IOInstallServicePlatformActions(IOService * service);
 IOReturn IOInstallServiceSleepPlatformActions(IOService * service);
 IOReturn IORemoveServicePlatformActions(IOService * service);

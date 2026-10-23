@@ -826,6 +826,416 @@ __options_decl(kt_granule_t, uint32_t, {
 
 #define KT_SUMMARY_MASK_TYPE_BITS  (0xffff)
 
+/*
+ * __builtin_xnu_type_{signature,summary,types_compatible} are Apple Clang
+ * extensions that walk a type's 8-byte granules. Upstream Clang has no
+ * equivalent. When they are absent:
+ *
+ * - summary: __builtin_classify_type. Scalars are data-only; pointers are
+ *   pointer-only; struct/union/array are mixed so they never take the
+ *   data-only heap (which must not contain pointers).
+ * - signature: empty. Boot grouping then uses size class (see
+ *   kalloc_type_cmp_fixed); weaker than layout hashing, still correct.
+ * - types_compatible: same-type check. Stricter than Apple's "same
+ *   signature" rule; valid for kfree_type's static assert.
+ */
+#if !__has_builtin(__builtin_xnu_type_summary)
+/* GCC/Clang classify_type: pointer=5, record=12, union=13, array=14. */
+#define __xnu_oss_type_summary(c) \
+	(((c) == 5) ? KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_POINTER) : \
+	(((c) == 12) || ((c) == 13) || ((c) == 14)) ? \
+	    (KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_POINTER) | \
+	    KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_DATA)) : \
+	    KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_DATA))
+#define __builtin_xnu_type_summary(type) \
+	__xnu_oss_type_summary(__builtin_classify_type(*((type *)0)))
+
+#if defined(__cplusplus) && __cplusplus >= 202002L
+/*
+ * The C fallback above treats every struct/union/array as "mixed"
+ * (possibly containing pointers), because __builtin_classify_type cannot
+ * look inside an aggregate. That is always safe, but it makes every
+ * plain-data struct (e.g. { uint64_t; uint64_t; }) ineligible for the
+ * data-only kalloc heap and fails static_asserts (e.g. OSData::withValue)
+ * that require an exact data-only proof. For C++ translation units we
+ * have a better option: walk the aggregate's members via structured
+ * bindings and classify each one recursively.
+ */
+extern "C++" {
+namespace __xnu_kt_detail {
+
+struct any_convertible {
+	template <typename T>
+	constexpr operator T() const;
+};
+
+template <typename Self>
+struct any_convertible_strict {
+	template <typename T>
+	constexpr operator T() const requires (!__is_same(T, Self));
+};
+
+template <typename T, typename... Args>
+consteval unsigned
+arity_impl()
+{
+	if constexpr (sizeof...(Args) > 16) {
+		return 17;
+	} else if constexpr (constexpr bool brace_grows = requires { T{ (Args{}, any_convertible{})..., any_convertible{} }; },
+	    paren_grows = requires { T( (Args{}, any_convertible_strict<T>{})..., any_convertible_strict<T>{} ); };
+	    brace_grows && paren_grows) {
+		return arity_impl<T, Args..., any_convertible>();
+	} else if constexpr (requires { T{ (Args{}, any_convertible{})..., any_convertible{} }; } !=
+	    requires { T( (Args{}, any_convertible_strict<T>{})..., any_convertible_strict<T>{} ); }) {
+		/*
+		 * Brace and paren construction disagree on whether one more
+		 * member exists: elision risk (see below), don't trust the
+		 * Args... prefix either.
+		 */
+		return 17;
+	} else if constexpr (requires { T{ (Args{}, any_convertible{})..., {} }; }) {
+		/*
+		 * Args... (length N) is a confirmed scalar-fillable prefix,
+		 * but there is at least one more member beyond it that
+		 * accepts an empty initializer without accepting a scalar
+		 * conversion - almost always a trailing array, most notably
+		 * C's "flexible array member" idiom used throughout this
+		 * codebase (e.g. `T entries[0]`). It is still a real,
+		 * structured-binding-visible member, just opaque to
+		 * any_convertible. A flexible array member is grammatically
+		 * required to be last, so more than one such member in a
+		 * row essentially doesn't happen; the check below is a
+		 * safety margin, not an expected case.
+		 */
+		if constexpr (requires { T{ (Args{}, any_convertible{})..., {}, {} }; }) {
+			return 17; /* too many opaque trailing members to safely resolve */
+		} else {
+			return sizeof...(Args) + 1;
+		}
+	} else {
+		return sizeof...(Args);
+	}
+}
+
+/*
+ * Number of direct data members of aggregate T.
+ *
+ * Brace-init counting (test T{u, u, ..., u} for growing u-counts) is the
+ * classic "ubiquitous convertible" arity probe, but braces allow brace
+ * elision: an array or nested-aggregate member silently absorbs several
+ * probe arguments, so the count it returns is a flattened scalar count,
+ * not a member count, whenever such a member is present. Parenthesized
+ * aggregate init (C++20) initializes members positionally with no
+ * elision, so it doesn't have that failure mode - but a *single* argument
+ * is ambiguous with a user-defined-conversion constructor call, which
+ * any_convertible_strict avoids by refusing to convert to T itself.
+ *
+ * The two methods have different, non-overlapping blind spots, so
+ * requiring them to agree on a growing prefix is a reliable check: they
+ * agree exactly when there is no elision to disagree about. A trailing
+ * member beyond that prefix which accepts only an empty initializer
+ * (see arity_impl) is counted separately. Any remaining disagreement, or
+ * a count over 16, falls back to the sentinel 17, telling the caller to
+ * skip decomposition and classify conservatively.
+ */
+template <typename T>
+consteval unsigned
+__xnu_kt_arity()
+{
+	if constexpr (!__is_aggregate(T) || !requires { T{}; }) {
+		return 17;
+	} else {
+		return arity_impl<T>();
+	}
+}
+
+template <typename T> consteval uint32_t __xnu_kt_summary();
+
+/* Classify one member (or, for an array member, its element type). */
+template <typename T>
+consteval uint32_t
+__xnu_kt_leaf_summary()
+{
+	using U = __remove_all_extents(__remove_cvref(T));
+	if constexpr (__is_pointer(U) || __is_member_pointer(U)) {
+		return KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_POINTER);
+	} else if constexpr (__is_arithmetic(U) || __is_enum(U)) {
+		return KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_DATA);
+	} else {
+		return __xnu_kt_summary<U>();
+	}
+}
+
+/*
+ * Decompose an aggregate into its direct members via structured bindings
+ * and OR together their granule summaries. Structured bindings require a
+ * literal member count, so this is an explicit table for arities 1-16;
+ * arity 0 (empty type) and >16 are handled by the caller.
+ */
+template <typename T>
+consteval uint32_t
+__xnu_kt_decompose()
+{
+	T obj{};
+		if constexpr (__xnu_kt_arity<T>() == 1) {
+			auto&& [m0] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 2) {
+			auto&& [m0, m1] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 3) {
+			auto&& [m0, m1, m2] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 4) {
+			auto&& [m0, m1, m2, m3] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 5) {
+			auto&& [m0, m1, m2, m3, m4] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 6) {
+			auto&& [m0, m1, m2, m3, m4, m5] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 7) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 8) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6, m7] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>() |
+			    __xnu_kt_leaf_summary<decltype(m7)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 9) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6, m7, m8] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>() |
+			    __xnu_kt_leaf_summary<decltype(m7)>() |
+			    __xnu_kt_leaf_summary<decltype(m8)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 10) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>() |
+			    __xnu_kt_leaf_summary<decltype(m7)>() |
+			    __xnu_kt_leaf_summary<decltype(m8)>() |
+			    __xnu_kt_leaf_summary<decltype(m9)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 11) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>() |
+			    __xnu_kt_leaf_summary<decltype(m7)>() |
+			    __xnu_kt_leaf_summary<decltype(m8)>() |
+			    __xnu_kt_leaf_summary<decltype(m9)>() |
+			    __xnu_kt_leaf_summary<decltype(m10)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 12) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>() |
+			    __xnu_kt_leaf_summary<decltype(m7)>() |
+			    __xnu_kt_leaf_summary<decltype(m8)>() |
+			    __xnu_kt_leaf_summary<decltype(m9)>() |
+			    __xnu_kt_leaf_summary<decltype(m10)>() |
+			    __xnu_kt_leaf_summary<decltype(m11)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 13) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>() |
+			    __xnu_kt_leaf_summary<decltype(m7)>() |
+			    __xnu_kt_leaf_summary<decltype(m8)>() |
+			    __xnu_kt_leaf_summary<decltype(m9)>() |
+			    __xnu_kt_leaf_summary<decltype(m10)>() |
+			    __xnu_kt_leaf_summary<decltype(m11)>() |
+			    __xnu_kt_leaf_summary<decltype(m12)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 14) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>() |
+			    __xnu_kt_leaf_summary<decltype(m7)>() |
+			    __xnu_kt_leaf_summary<decltype(m8)>() |
+			    __xnu_kt_leaf_summary<decltype(m9)>() |
+			    __xnu_kt_leaf_summary<decltype(m10)>() |
+			    __xnu_kt_leaf_summary<decltype(m11)>() |
+			    __xnu_kt_leaf_summary<decltype(m12)>() |
+			    __xnu_kt_leaf_summary<decltype(m13)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 15) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>() |
+			    __xnu_kt_leaf_summary<decltype(m7)>() |
+			    __xnu_kt_leaf_summary<decltype(m8)>() |
+			    __xnu_kt_leaf_summary<decltype(m9)>() |
+			    __xnu_kt_leaf_summary<decltype(m10)>() |
+			    __xnu_kt_leaf_summary<decltype(m11)>() |
+			    __xnu_kt_leaf_summary<decltype(m12)>() |
+			    __xnu_kt_leaf_summary<decltype(m13)>() |
+			    __xnu_kt_leaf_summary<decltype(m14)>();
+		}
+		if constexpr (__xnu_kt_arity<T>() == 16) {
+			auto&& [m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15] = obj;
+			return __xnu_kt_leaf_summary<decltype(m0)>() |
+			    __xnu_kt_leaf_summary<decltype(m1)>() |
+			    __xnu_kt_leaf_summary<decltype(m2)>() |
+			    __xnu_kt_leaf_summary<decltype(m3)>() |
+			    __xnu_kt_leaf_summary<decltype(m4)>() |
+			    __xnu_kt_leaf_summary<decltype(m5)>() |
+			    __xnu_kt_leaf_summary<decltype(m6)>() |
+			    __xnu_kt_leaf_summary<decltype(m7)>() |
+			    __xnu_kt_leaf_summary<decltype(m8)>() |
+			    __xnu_kt_leaf_summary<decltype(m9)>() |
+			    __xnu_kt_leaf_summary<decltype(m10)>() |
+			    __xnu_kt_leaf_summary<decltype(m11)>() |
+			    __xnu_kt_leaf_summary<decltype(m12)>() |
+			    __xnu_kt_leaf_summary<decltype(m13)>() |
+			    __xnu_kt_leaf_summary<decltype(m14)>() |
+			    __xnu_kt_leaf_summary<decltype(m15)>();
+		}
+	return KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_POINTER) |
+	    KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_DATA);
+}
+
+/*
+ * Full type summary for C++: walks aggregates recursively instead of the
+ * plain __builtin_classify_type approximation, so that pointer-free plain
+ * data structs (e.g. { uint64_t; uint64_t; }) are correctly recognized
+ * as data-only instead of conservatively rejected. Non-aggregates,
+ * unions, polymorphic classes, and aggregates __xnu_kt_arity can't pin
+ * down (see above) fall back to the same conservative "mixed"
+ * classification the C path uses, which is always safe (just ineligible
+ * for the data-only heap).
+ */
+template <typename T>
+consteval uint32_t
+__xnu_kt_summary()
+{
+	if constexpr (__is_array(T)) {
+		/*
+		 * Top-level array type (e.g. OSData::withValue(unsigned char
+		 * uuid[16])): classify by element type directly. The
+		 * brace/paren arity probe below is class-oriented -
+		 * parenthesized aggregate-init syntax doesn't apply to array
+		 * types, so it would always disagree with the brace count
+		 * and conservatively (wrongly) call every array type mixed.
+		 */
+		return __xnu_kt_leaf_summary<T>();
+	} else if constexpr (__is_pointer(T) || __is_member_pointer(T)) {
+		return KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_POINTER);
+	} else if constexpr (__is_arithmetic(T) || __is_enum(T)) {
+		return KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_DATA);
+	} else if constexpr (__is_union(T) || __is_polymorphic(T) ||
+	    !__is_standard_layout(T) || !__is_aggregate(T) || !__is_literal_type(T)) {
+		/*
+		 * !__is_literal_type also catches types the decompose path
+		 * could never handle anyway: a flexible array member (e.g.
+		 * `T entries[0]`, used throughout this codebase) makes T
+		 * non-literal, and `T obj{};` below is only valid in a
+		 * consteval function for a literal type.
+		 */
+		return KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_POINTER) |
+		    KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_DATA);
+	} else if constexpr (__xnu_kt_arity<T>() == 0) {
+		return KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_DATA);
+	} else if constexpr (__xnu_kt_arity<T>() > 16) {
+		return KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_POINTER) |
+		    KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_DATA);
+	} else {
+		return __xnu_kt_decompose<T>();
+	}
+}
+
+} /* namespace __xnu_kt_detail */
+} /* extern "C++" */
+
+#undef __builtin_xnu_type_summary
+#define __builtin_xnu_type_summary(type) \
+	(__xnu_kt_detail::__xnu_kt_summary<type>())
+#endif /* defined(__cplusplus) && __cplusplus >= 202002L */
+#endif
+
+#if !__has_builtin(__builtin_xnu_type_signature)
+#define __builtin_xnu_type_signature(type) ""
+#endif
+
+#if !__has_builtin(__builtin_xnu_types_compatible)
+#if defined(__cplusplus)
+#define __builtin_xnu_types_compatible(t1, t2) __is_same(t1, t2)
+#else
+#define __builtin_xnu_types_compatible(t1, t2) \
+	__builtin_types_compatible_p(t1, t2)
+#endif
+#endif
+
 #define KT_SUMMARY_MASK_DATA                             \
 	(KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_PADDING) |  \
 	    KT_SUMMARY_GRANULE_TO_IDX(KT_GRANULE_DATA))

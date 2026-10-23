@@ -86,8 +86,8 @@ typedef int errno_t;
 #include <TargetConditionals.h>
 #endif
 
-#if __has_include(<os/availability.h>)
-#include <os/availability.h>
+#if __has_include(<Availability.h>)
+#include <Availability.h>
 #endif
 
 #if __has_include(<sys/cdefs.h>)

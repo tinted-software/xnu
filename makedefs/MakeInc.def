@@ -29,7 +29,7 @@ SUPPORTED_ARM64_MACHINE_CONFIGS = NONE
 else ifneq ($(findstring _host,$(RC_ProjectName)),)
 SUPPORTED_ARM64_MACHINE_CONFIGS = NONE
 else
-SUPPORTED_ARM64_MACHINE_CONFIGS = T6000 T6020 T6030 T6031 T6041 T6050 T8101 T8103 T8112 T8122 T8132 T8142 VMAPPLE
+SUPPORTED_ARM64_MACHINE_CONFIGS = T6000 T6020 T6030 T6031 T6041 T6050 T8101 T8103 T8112 T8122 T8132 T8142 VMAPPLE QEMU QEMU_ARM64E QEMU_A55
 
 SPTM_ENABLED_SOCS_MacOSX = t6000 t8112 t6020 t8122 t6030 t6031 t6041 t6050 t8132 t8142
 EXCLAVES_ENABLED_SOCS_MacOSX = t8142 t6050
@@ -72,6 +72,14 @@ ifneq ($(filter $(CURRENT_MACHINE_CONFIG_LC),$(MTE_SUPPORTED_SOCS)),)
 	DOCONF_KERNEL_TAG := -tag
 endif
 
+# Boards that are not Apple silicon (QEMU virt, SUPERBIRD, ...) select the
+# "OSS hardware" configuration: build the machine-dependent pmap/asm from
+# source (nos_arm_asm / nos_arm_pmap) instead of a KDK support library,
+# skip Apple PMU/counters, and enable the APFSRO/TMPFS root filesystems.
+ifneq ($(filter QEMU QEMU_ARM64E QEMU_A55 SUPERBIRD IPAD41,$(CURRENT_MACHINE_CONFIG)),)
+	DOCONF_OSSHW := -osshw
+endif
+
 #
 # Component List
 #
@@ -93,6 +101,18 @@ MACHINE_FLAGS_ARM64_T8132 = -DARM64_BOARD_CONFIG_T8132			-mcpu=apple-m4
 MACHINE_FLAGS_ARM64_T8142 = -DARM64_BOARD_CONFIG_T8142 			-mcpu=apple-m4+memtag+predres2
 
 MACHINE_FLAGS_ARM64_VMAPPLE = -DARM64_BOARD_CONFIG_VMAPPLE              -march=armv8.5a+sme2
+
+# QEMU virt, plain ARMv8.0-A (cortex-a53), 4K pages, no PAuth, no PPL.
+MACHINE_FLAGS_ARM64_QEMU = -DARM64_BOARD_CONFIG_QEMU -DQEMU -mcpu=cortex-a53
+# QEMU virt with pointer authentication (arm64e) and the 16K page size the
+# Apple userspace ABI requires. -mcpu=generic+pauth because neither the
+# cpu model nor the arm64e triple alone implies FEAT_PAuth in the
+# integrated assembler.
+MACHINE_FLAGS_ARM64_QEMU_ARM64E = -DARM64_BOARD_CONFIG_QEMU_ARM64E -DQEMU -D__ARM_16K_PG__=1 -mcpu=generic+pauth
+# QEMU virt modelled as a Cortex-A55 (plain ARMv8.2-A, no PAuth - neither
+# the CPU model nor real A55 silicon has pointer authentication), with the
+# 16K page size the Apple userspace ABI requires.
+MACHINE_FLAGS_ARM64_QEMU_A55 = -DARM64_BOARD_CONFIG_QEMU_A55 -DQEMU -D__ARM_16K_PG__=1 -mcpu=cortex-a55
 
 
 #
@@ -157,6 +177,7 @@ DEPLOYMENT_TARGET_DEFINES = -DXNU_PLATFORM_$(PLATFORM_FOR_CONFIG)
 DEFINES = -DAPPLE -DKERNEL -DKERNEL_PRIVATE -DXNU_KERNEL_PRIVATE \
 	-DPRIVATE -D__MACHO__=1 -Dvolatile=__volatile -DXNU_KERN_EVENT_DATA_IS_VLA \
 	-DCURRENT_MACHINE_CONFIG_LC=$(CURRENT_MACHINE_CONFIG_LC) \
+	-DOS_FIREHOSE_SPI=1 \
 	$(CONFIG_DEFINES) $(SEED_DEFINES)
 
 # Append experimental definition
@@ -344,6 +365,12 @@ endif
 
 ifneq ($(filter ARM ARM64,$(CURRENT_ARCH_CONFIG)),)
 
+# Boards whose CPU has no pointer authentication (QEMU's cortex-a55) must be
+# built for the plain arm64 target, not arm64e.
+ifneq ($(filter QEMU_A55,$(CURRENT_MACHINE_CONFIG)),)
+ARCH_STRING_FOR_CURRENT_MACHINE_CONFIG := arm64
+endif
+
 ifneq ($(findstring _Sim,$(RC_ProjectName)),)
 ARCH_FLAGS_ARM64          = -arch arm64e
 else ifneq ($(findstring _host,$(RC_ProjectName)),)
@@ -446,6 +473,67 @@ ARM64_PLKSEG_ADDR  = 0xfffffe0004004000
 ARM64_LINK_ADDR    = 0xfffffe0007004000
 endif
 
+
+#
+# Kernelcache (MH_FILESET) build.  A kernel that hosts prelinked kexts is
+# linked at its in-collection address: the collection mach header sits at
+# KERNELCACHE_BASE, the kernel's __TEXT at +0x8000, and the segments that
+# hold kexts are placed at the offsets tools/kernelcache/kernelcache.py
+# expects (build-kernelcache.sh passes the same numbers).  The empty
+# __PRELINK_*/__PLK_* segments the kernel uses to find the kext regions are
+# added by the assembler, so they are not created by the linker here.
+#
+# Layout (offsets from KERNELCACHE_BASE):
+#   0x008000 kernel __TEXT          (<= 1.5M)
+#   0x200000 kext __TEXT            (2M)
+#   0x400000 kernel __DATA_CONST
+#   0x500000 kernel __LASTDATA_CONST
+#   0x500000 kext __DATA_CONST      (1M)
+#   0x600000 kext __TEXT_EXEC       (2M)
+#   0x800000 kernel __TEXT_EXEC
+#  0x1600000 kernel __TEXT_BOOT_EXEC / __KLD / __LAST
+#  0x1800000 kernel __KLDDATA, then __DATA, __BOOTDATA
+#  0x1d00000 kext __DATA            (1M)
+#  0x1e00000 __LINKEDIT
+#
+KERNELCACHE ?= 0
+ifeq ($(KERNELCACHE),1)
+KERNELCACHE_BASE        = 0xfffffff004000000
+KERNELCACHE_KERNEL_OFF  = 0x8000
+ARM64_LINK_ADDR         = $(KERNELCACHE_BASE)
+ARM64_PLKSEG_ADDR       = $(KERNELCACHE_BASE)
+ARM64_IMAGE_BASE        = $(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + $(KERNELCACHE_KERNEL_OFF) ))')
+KERNELCACHE_SEGADDRS    = \
+	-Wl,-segaddr,__DATA_CONST,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x400000 ))') \
+	-Wl,-segaddr,__LASTDATA_CONST,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x500000 ))') \
+	-Wl,-segaddr,__TEXT_EXEC,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x800000 ))') \
+	-Wl,-segaddr,__TEXT_BOOT_EXEC,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1600000 ))') \
+	-Wl,-segaddr,__KLD,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1608000 ))') \
+	-Wl,-segaddr,__LAST,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x160c000 ))') \
+	-Wl,-segaddr,__KLDDATA,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1800000 ))') \
+	-Wl,-segaddr,__DATA,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1810000 ))') \
+	-Wl,-segaddr,__BOOTDATA,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1b10000 ))') \
+	-Wl,-segaddr,__LINKEDIT,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1e00000 ))')
+LDFLAGS_KERNEL_PRELINK_STANDALONE =
+LDFLAGS_KERNEL_PLK_SECTS =
+# Room for the six empty prelink/PLK segments the assembler appends.
+LDFLAGS_KERNEL_HEADERPAD = -Wl,-headerpad,0x2000
+LDFLAGS_KERNEL_IMAGE_BASE = -Wl,-image_base,$(ARM64_IMAGE_BASE) $(KERNELCACHE_SEGADDRS)
+else
+ARM64_IMAGE_BASE        = $(ARM64_LINK_ADDR)
+LDFLAGS_KERNEL_HEADERPAD = -Wl,-headerpad,152
+LDFLAGS_KERNEL_PRELINK_STANDALONE = \
+	-Wl,-sectcreate,__PRELINK_TEXT,__text,/dev/null \
+	-Wl,-segprot,__PRELINK_TEXT,r-x,r-x \
+	-Wl,-sectcreate,__PRELINK_INFO,__info,/dev/null
+LDFLAGS_KERNEL_PLK_SECTS = \
+	-Wl,-sectcreate,"__PLK_TEXT_EXEC",__text,/dev/null \
+	-Wl,-sectcreate,__PRELINK_DATA,__data,/dev/null \
+	-Wl,-sectcreate,"__PLK_DATA_CONST",__data,/dev/null \
+	-Wl,-sectcreate,"__PLK_LLVM_COV",__llvm_covmap,/dev/null \
+	-Wl,-sectcreate,"__PLK_LINKEDIT",__data,/dev/null
+LDFLAGS_KERNEL_IMAGE_BASE = -Wl,-segaddr,__PRELINK_TEXT,$(ARM64_PLKSEG_ADDR) -Wl,-image_base,$(ARM64_LINK_ADDR)
+endif
 
 ifeq ($(ARM64_LARGE_MEMORY),1)
 	ARM64_EXTRA_BUILD_FLAGS += -DARM_LARGE_MEMORY=1
@@ -903,13 +991,11 @@ LDFLAGS_KERNEL_GEN = \
 	-Wl,-sectalign,__TEXT,__text,0x1000 \
 	-Wl,-sectalign,__DATA,__common,0x1000 \
 	-Wl,-sectalign,__DATA,__bss,0x1000 \
-	-Wl,-sectcreate,__PRELINK_TEXT,__text,/dev/null \
-	-Wl,-segprot,__PRELINK_TEXT,r-x,r-x \
-	-Wl,-sectcreate,__PRELINK_INFO,__info,/dev/null \
+	$(LDFLAGS_KERNEL_PRELINK_STANDALONE) \
 	-Wl,-pagezero_size,0x0 \
 	-Wl,-version_load_command \
 	-Wl,-function_starts \
-	-Wl,-headerpad,152
+	$(LDFLAGS_KERNEL_HEADERPAD)
 
 # LDFLAGS_KERNEL_SDK	= -L$(SDKROOT)/usr/local/lib/kernel -lfirehose_kernel
 LDFLAGS_KERNEL_SDK	= -L$(SDKROOT)/usr/local/lib/kernel -L$(SDKROOT)/usr/local/lib/kernel/platform
@@ -1034,8 +1120,7 @@ LDFLAGS_KERNEL_PROFILEX86_64H = $(LDFLAGS_KERNEL_RELEASEX86_64H)
 LDFLAGS_KERNEL_GENARM64 = \
 	-Wl,-pie \
 	-Wl,-static \
-	-Wl,-segaddr,__PRELINK_TEXT,$(ARM64_PLKSEG_ADDR) \
-	-Wl,-image_base,$(ARM64_LINK_ADDR) \
+	$(LDFLAGS_KERNEL_IMAGE_BASE) \
 	\
 	-Wl,-rename_section,__HIB,__text,__TEXT_EXEC,__hib_text \
 	\
@@ -1061,11 +1146,7 @@ LDFLAGS_KERNEL_GENARM64 = \
 	-Wl,-segprot,__KLD,r-x,r-x \
 	-Wl,-rename_section,__TEXT,__text,__TEXT_EXEC,__text \
 	-Wl,-rename_section,__TEXT,__stubs,__TEXT_EXEC,__stubs \
-	-Wl,-sectcreate,"__PLK_TEXT_EXEC",__text,/dev/null \
-	-Wl,-sectcreate,__PRELINK_DATA,__data,/dev/null \
-	-Wl,-sectcreate,"__PLK_DATA_CONST",__data,/dev/null \
-	-Wl,-sectcreate,"__PLK_LLVM_COV",__llvm_covmap,/dev/null \
-	-Wl,-sectcreate,"__PLK_LINKEDIT",__data,/dev/null
+	$(LDFLAGS_KERNEL_PLK_SECTS)
 
 # To support code coverage for kexts, the coverage mapping sections __llvm_covmap
 # and __llvm_covfun are put into the __PLK_LLVM_COV segment rather than the
@@ -1151,8 +1232,18 @@ LD_KERNEL_LIBS	   = -lcc_kext
 LD_KERNEL_ARCHIVES = $(LDFLAGS_KERNEL_SDK) -lfirehose_kernel
 
 # Link binary support library
+# Build the machine-dependent (pmap / asm / pcb / start) support objects from
+# the sources in this tree instead of force-loading the prebuilt KDK library.
+# The KDK library is version-locked to the exact xnu release, which we cannot
+# match when patching.  Pass KDK_KERNEL_SUPPORT=0 to build them from source
+# (requires the nos_arm_asm / nos_arm_pmap config attributes to be enabled).
+ifeq ($(KDK_KERNEL_SUPPORT),)
+KDK_KERNEL_SUPPORT = 1
+endif
+ifeq ($(KDK_KERNEL_SUPPORT),1)
 ifneq ($(CURRENT_MACHINE_CONFIG),NONE)
         LDFLAGS_KERNEL_ONLY += -rdynamic -Wl,-force_load,$(KDKROOT)/System/Library/KernelSupport/lib$(CURRENT_MACHINE_CONFIG).os.$(CURRENT_KERNEL_CONFIG).a
+endif
 endif
 
 #
@@ -1190,6 +1281,14 @@ ifeq ($(EXCLAVES_ENABLED),1)
 endif # !EXCLAVES_ENABLED
 
 
+# Tightbeam is Apple's SEP/exclaves transport.  Builds for boards without a
+# secure enclave (OSS_HARDWARE) do not need it, and the macOS-flavoured KDK
+# archive cannot be linked into an iPhoneOS kernel anyway.  Pass
+# BUILD_TIGHTBEAM=0 to skip it entirely.
+ifeq ($(BUILD_TIGHTBEAM),)
+BUILD_TIGHTBEAM = 1
+endif
+ifeq ($(BUILD_TIGHTBEAM),1)
 ifneq ($(wildcard $(SDKROOT)/usr/local/lib/kernel/platform/libTightbeam.a),)
 XNU_CONFIG_TIGHTBEAM := 1
 TIGHTBEAM_IN_SDK := 1
@@ -1205,6 +1304,7 @@ ifeq ($(XNU_CONFIG_TIGHTBEAM),1)
     LD_KERNEL_ARCHIVES += -Wl,-force_load,$(KDKROOT)/usr/local/lib/kernel/platform/libTightbeam.a
     TIGHTBEAM_EXPORTS := $(KDKROOT)/usr/local/lib/kernel/platform/libTightbeam.exports
   endif # TIGHTBEAM_IN_SDK
+endif
 endif
 
 #
@@ -1227,7 +1327,7 @@ INCFLAGS_IMPORT	= $(patsubst %, -I$(OBJROOT)/EXPORT_HDRS/%, $(COMPONENT_IMPORT_L
 INCFLAGS_EXTERN	= -I$(SRCROOT)/EXTERNAL_HEADERS
 INCFLAGS_GEN	= -I$(SRCROOT)/$(COMPONENT) -I$(OBJROOT)/EXPORT_HDRS/$(COMPONENT)
 INCFLAGS_LOCAL	= -I.
-INCFLAGS_SDK    = -I$(SDKROOT)/usr/local/include/kernel -I$(SDKROOT)/usr/local/include/iBoot -I$(SDKROOT)/$(KPINCDIR)/AppleFeatures
+INCFLAGS_SDK    = -I$(SDKROOT)/usr/local/include/kernel -I$(SDKROOT)/usr/local/include/iBoot -I$(SDKROOT)/$(KPINCDIR) -I$(SDKROOT)/$(KINCDIR) -I$(SDKROOT)/$(KPINCDIR)/AppleFeatures
 INCFLAGS_PLATFORM = -I$(SDKROOT)/$(KPINCDIR)/platform
 ifneq ($(KDKROOT),)
 INCFLAGS_SDK   += -I$(KDKROOT)/$(KPINCDIR) -I$(KDKROOT)/System/Library/KernelSupport

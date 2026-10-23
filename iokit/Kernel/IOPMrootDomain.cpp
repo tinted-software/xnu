@@ -3985,10 +3985,13 @@ IOPMrootDomain::tellChangeUp( unsigned long stateNum )
 		OSKextSystemSleepOrWake( kIOMessageSystemHasPoweredOn );
 
 		// Notify platform that sleep was cancelled or resumed.
-		getPlatform()->callPlatformFunction(
-			sleepMessagePEFunction.get(), false,
-			(void *)(uintptr_t) kIOMessageSystemHasPoweredOn,
-			NULL, NULL, NULL);
+		IOService *platform = getPlatform();
+		if (platform) {
+			platform->callPlatformFunction(
+				sleepMessagePEFunction.get(), false,
+				(void *)(uintptr_t) kIOMessageSystemHasPoweredOn,
+				NULL, NULL, NULL);
+		}
 
 		if (getPowerState() == ON_STATE) {
 			// Sleep was cancelled by idle cancel or revert
@@ -4065,10 +4068,12 @@ IOPMrootDomain::sysPowerDownHandler(
 	    messageType == kIOMessageSystemHasPoweredOn) {
 		switch (messageType) {
 		case kIOMessageSystemWillPowerOn:
-			assert(lastSystemMessageType == kIOMessageSystemWillSleep);
+			/* lastSystemMessageType == 0 is cold boot: tellChangeUp(ON)
+			 * can notify kernel clients without a preceding WillSleep. */
+			assert(lastSystemMessageType == 0 || lastSystemMessageType == kIOMessageSystemWillSleep);
 			break;
 		case kIOMessageSystemHasPoweredOn:
-			assert(lastSystemMessageType == kIOMessageSystemWillPowerOn);
+			assert(lastSystemMessageType == 0 || lastSystemMessageType == kIOMessageSystemWillPowerOn);
 			break;
 		}
 
@@ -4111,10 +4116,13 @@ IOPMrootDomain::sysPowerDownHandler(
 
 			// Notify platform that sleep has begun, after the early
 			// sleep policy evaluation.
-			getPlatform()->callPlatformFunction(
-				sleepMessagePEFunction.get(), false,
-				(void *)(uintptr_t) kIOMessageSystemWillSleep,
-				NULL, NULL, NULL);
+			IOService *platform = getPlatform();
+			if (platform) {
+				platform->callPlatformFunction(
+					sleepMessagePEFunction.get(), false,
+					(void *)(uintptr_t) kIOMessageSystemWillSleep,
+					NULL, NULL, NULL);
+			}
 
 			if (!OSCompareAndSwap( 0, 1, &gSleepOrShutdownPending )) {
 				// Purposely delay the ack and hope that shutdown occurs quickly.

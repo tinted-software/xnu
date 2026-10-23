@@ -2077,6 +2077,7 @@ grade:
 	 */
 	lret = load_machfile(imgp, mach_header, thread, &map, &load_result);
 	if (lret != LOAD_SUCCESS) {
+		printf("exec_mach_imgact: load_machfile returned lret=%d\n", lret);
 		error = load_return_to_errno(lret);
 
 		KERNEL_DEBUG_CONSTANT(BSDDBG_CODE(DBG_BSD_PROC, BSD_PROC_EXITREASON_CREATE) | DBG_FUNC_NONE,

@@ -25,6 +25,7 @@
  *
  * @APPLE_OSREFERENCE_LICENSE_HEADER_END@
  */
+#include <pexpert/arm64/board_config.h>
 /*
  * NOTICE: This file was modified by SPARTA, Inc. in 2005 to introduce
  * support for mandatory and extensible security protections.  This notice
@@ -34,6 +35,27 @@
 
 const char * gIOKernelConfigTables =
     "("
+    "   {"
+    "     'IOClass'         = AppleARMPE;"
+    "     'IOProviderClass' = IOPlatformExpertDevice;"
+    "     'IOProbeScore'    = 1000:32;"
+    "     'IONameMatch'     = 'device-tree';"
+    "   },"
+#if OSS_HARDWARE
+    /*
+     * Embedded fallback platform expert for non-Apple-silicon boards
+     * (QEMU, SUPERBIRD, IPAD41, ...) whose minimal device trees may not
+     * satisfy AppleARMPE's IONameMatch above. See IOOSSPlatformExpert in
+     * IOPlatformExpert.cpp for details. Scored below AppleARMPE so real
+     * hardware still prefers it, but above IOPanicPlatform so these
+     * boards always end up with a live IOPlatformExpert.
+     */
+    "   {"
+    "     'IOClass'         = IOOSSPlatformExpert;"
+    "     'IOProviderClass' = IOPlatformExpertDevice;"
+    "     'IOProbeScore'    = 500:32;"
+    "   },"
+#endif /* OSS_HARDWARE */
     "   {"
     "     'IOClass'         = IOPanicPlatform;"
     "     'IOProviderClass' = IOPlatformExpertDevice;"

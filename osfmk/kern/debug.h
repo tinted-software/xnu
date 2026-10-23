@@ -980,6 +980,9 @@ struct panic_lockdown_initiator_state {
 extern void panic_lockdown_record_debug_data(void);
 #endif /* CONFIG_SPTM && (DEVELOPMENT || DEBUG) */
 
+/* Halt forever after emitting panic output (defined in kern/debug.c). */
+extern void panic_spin_forever(void) __dead2;
+
 #endif  /* XNU_KERNEL_PRIVATE */
 
 __END_DECLS

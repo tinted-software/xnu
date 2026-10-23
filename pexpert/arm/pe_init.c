@@ -21,6 +21,7 @@
 #include <os/overflow.h>
 
 #include <pexpert/arm64/board_config.h>
+#include <pexpert/arm64/gic.h>
 
 #if CONFIG_SPTM
 #include <arm64/sptm/sptm.h>
@@ -327,6 +328,11 @@ PE_init_iokit(void)
 	show_progress = FALSE;
 	PE_parse_boot_argn("-progress", &show_progress, sizeof(show_progress));
 #endif /* XNU_TARGET_OS_OSX */
+	/* Headless: the delta loop below is `while (image >= display/2)`
+	 * with display_size 0, which never terminates in RELEASE. */
+	if (PE_state.video.v_width == 0 || PE_state.video.v_height == 0) {
+		show_progress = FALSE;
+	}
 	if (show_progress) {
 		/* Rotation: 0:normal, 1:right 90, 2:left 180, 3:left 90 */
 		switch (PE_state.video.v_rotate) {
@@ -408,18 +414,6 @@ PE_init_iokit(void)
 void
 PE_lockdown_iokit(void)
 {
-	/*
-	 * On arm/arm64 platforms, and especially those that employ KTRR/CTRR,
-	 * machine_lockdown() is treated as a hard security checkpoint, such that
-	 * code which executes prior to lockdown must be minimized and limited only to
-	 * trusted parts of the kernel and specially-entitled kexts.  We therefore
-	 * cannot start the general-purpose IOKit matching process until after lockdown,
-	 * as it may involve execution of untrusted/non-entitled kext code.
-	 * Furthermore, such kext code may process attacker controlled data (e.g.
-	 * network packets), which dramatically increases the potential attack surface
-	 * against a kernel which has not yet enabled the full set of available
-	 * hardware protections.
-	 */
 	zalloc_iokit_lockdown();
 	StartIOKitMatching();
 }
@@ -469,6 +463,7 @@ PE_init_platform(boolean_t vm_initialized, void *args)
 		pe_identify_machine(boot_args_ptr);
 	} else {
 		pe_arm_init_interrupts(args);
+		gic_init();
 	}
 
 	if (!vm_initialized) {

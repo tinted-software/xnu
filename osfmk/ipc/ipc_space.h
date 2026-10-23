@@ -86,7 +86,9 @@
 #include <ipc/ipc_types.h>
 
 #include <os/refcnt.h>
+#include <kern/locks.h>
 #endif
+
 
 __BEGIN_DECLS
 

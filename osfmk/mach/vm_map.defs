@@ -378,20 +378,14 @@ routine vm_map_page_query(
         out     ref_count       :integer_t);
 
 /*
- *	Returns information about a region of memory.
- *	Includes info about the chain of objects rooted at that region.
- *      Only available in MACH_VM_DEBUG compiled kernels,
- *      otherwise returns KERN_FAILURE.
+ *	mach_vm_region_info / vm_mapped_pages_info: marked OBSOLETE, and
+ *	their implementations (MACH_VM_DEBUG-gated) are not present in this
+ *	source drop. Skipped rather than stubbed, preserving MIG routine
+ *	numbers for wire-protocol stability - same treatment already given
+ *	to vm_region_object_create below.
  */
-routine mach_vm_region_info(
-		task		: vm_map_read_t;
-		address		: vm_address_t;
-	out	region		: vm_info_region_t;
-	out	objects		: vm_info_object_array_t);
-
-routine	vm_mapped_pages_info(  /* OBSOLETE */
-		task		: vm_map_read_t;
-	out	pages		: page_address_array_t);
+skip; /* was mach_vm_region_info */
+skip; /* was vm_mapped_pages_info */
 
 skip; /* was vm_region_object_create */
 
@@ -420,11 +414,7 @@ routine vm_region_recurse_64(
 	inout	nesting_depth	: natural_t;
 	out	info		: vm_region_recurse_info_t,CountInOut);
 
-routine mach_vm_region_info_64( /* OBSOLETE */
-		task		: vm_map_read_t;
-		address		: vm_address_t;
-	out	region		: vm_info_region_64_t;
-	out	objects		: vm_info_object_array_t);
+skip; /* was mach_vm_region_info_64 (OBSOLETE, no OSS implementation) */
 
 routine vm_region_64(
                 target_task     : vm_map_read_t;

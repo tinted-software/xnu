@@ -727,20 +727,11 @@ DebuggerTrapWithState(debugger_op db_op, const char *db_message, const char *db_
 {
 	kern_return_t ret;
 
-#if defined(__arm64__) && (DEVELOPMENT || DEBUG)
-	if (!PE_arm_debug_and_trace_initialized()) {
-		/*
-		 * In practice this can only happen if we panicked very early,
-		 * when only the boot CPU is online and before it has finished
-		 * initializing the debug and trace infrastructure. We're going
-		 * to hang soon, so let's at least make sure the message passed
-		 * to panic() is actually logged.
-		 */
+	if (db_panic_str && db_panic_args) {
 		char buf[EARLY_PANIC_BUFLEN];
 		vsnprintf(buf, EARLY_PANIC_BUFLEN, db_panic_str, *db_panic_args);
 		paniclog_append_noflush("%s\n", buf);
 	}
-#endif
 
 	assert(ml_get_interrupts_enabled() == FALSE);
 	DebuggerSaveState(db_op, db_message, db_panic_str, db_panic_args,
@@ -1818,13 +1809,7 @@ handle_debugger_trap(unsigned int exception, unsigned int code, unsigned int sub
 			panic_stop();
 		}
 #endif /* __arm64__ */
-#if defined(__arm64__) && (DEBUG || DEVELOPMENT)
-		if (!PE_arm_debug_and_trace_initialized()) {
-			paniclog_append_noflush("kernel panicked before debug and trace infrastructure initialized!\n"
-			    "spinning forever...\n");
-			panic_spin_forever();
-		}
-#endif
+
 		debugger_collect_diagnostics(exception, code, subcode, state);
 	}
 
@@ -2239,8 +2224,13 @@ kern_feature_override_init(void)
 }
 STARTUP(TUNABLES, STARTUP_RANK_LAST, kern_feature_override_init);
 
-#if MACH_ASSERT
+/*
+ * Defined unconditionally: iokit/IOKit/assert.h's IOASSERT independently
+ * forces mach_assert_enabled() (and therefore this key) live even on
+ * kernel configs where MACH_ASSERT itself is off.
+ */
 STATIC_IF_KEY_DEFINE_TRUE(mach_assert);
+#if MACH_ASSERT
 STATIC_IF_KEY_DEFINE_TRUE(lck_rw_debug);
 #endif
 

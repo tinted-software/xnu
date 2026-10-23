@@ -83,6 +83,16 @@ IOCPUInitialize(void)
 	    OSString::withCStringNoCopy("Stopped");
 	gIOCPUStateNames[kIOCPUStateRunning] =
 	    OSString::withCStringNoCopy("Running");
+
+	/*
+	 * Boards without USE_APPLEARMSMP have no AppleARMCPU/AppleARMPlatform kext
+	 * to publish an IOCPUInterruptController for them.  Do it ourselves, since
+	 * initCPUInterruptController() is the only caller of ml_set_max_cpus() and
+	 * kperf_init_early() blocks in ml_wait_max_cpus() until it runs.
+	 */
+#if defined(__arm64__)
+	oss_arm_cpu_initialize();
+#endif
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */

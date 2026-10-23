@@ -111,7 +111,8 @@ options		CONFIG_WORKLOOP_DEBUG	# <config_workloop_debug>
 #
 #	4.4 filesystems
 #
-options		MOCKFS		# Boot from an executable	# <mockfs>
+options		APFSRO		# Boot from a read-only APFS ramdisk	# <apfsro>
+options		TMPFS		# in-memory filesystem (backs /private/var at boot)	# <tmpfs>
 options		FIFO		# fifo support			# <fifo>
 options		FDESC		# fdesc_fs support		# <fdesc>
 options		DEVFS		# devfs support			# <devfs>

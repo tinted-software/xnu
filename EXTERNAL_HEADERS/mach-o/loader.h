@@ -1286,12 +1286,32 @@ struct build_tool_version {
 #define PLATFORM_XROS 11
 #define PLATFORM_XROSSIMULATOR 12
 #define PLATFORM_MAX PLATFORM_XROSSIMULATOR
+
+/* cctools spellings of the same values; dyld uses these. */
+#ifndef PLATFORM_VISIONOS
+#define PLATFORM_VISIONOS PLATFORM_XROS
+#endif
+#ifndef PLATFORM_VISIONOSSIMULATOR
+#define PLATFORM_VISIONOSSIMULATOR PLATFORM_XROSSIMULATOR
+#endif
+#ifndef PLATFORM_IOSMAC
+#define PLATFORM_IOSMAC PLATFORM_MACCATALYST
+#endif
 /* Addition of simulated platfrom also needs to update proc_is_simulated() */ 
 
 /* Known values for the tool field above. */
 #define TOOL_CLANG 1
 #define TOOL_SWIFT 2
 #define TOOL_LD	3
+#define TOOL_LLD 4
+
+/* Platform values used by dyld, same numbering as cctools. */
+#ifndef PLATFORM_FIRMWARE
+#define PLATFORM_FIRMWARE 13
+#endif
+#ifndef PLATFORM_SEPOS
+#define PLATFORM_SEPOS 14
+#endif
 
 /*
  * The dyld_info_command contains the file offsets and sizes of 

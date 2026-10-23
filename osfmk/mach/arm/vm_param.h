@@ -134,7 +134,21 @@ extern int PAGE_SHIFT_CONST;
 /* system-wide values */
 #define MACH_VM_MIN_ADDRESS_RAW 0x0ULL
 #if defined(XNU_PLATFORM_MacOSX) || defined(XNU_PLATFORM_DriverKit)
+#if __ARM_16K_PG__
 #define MACH_VM_MAX_ADDRESS_RAW 0x00007FFFFE000000ULL
+#else
+/*
+ * 4K-page macOS-flavored boards (SUPERBIRD/IPAD41/QEMU - no real Apple
+ * silicon macOS target is ever 4K) can't use the full 47-bit macOS
+ * ceiling here: osfmk/arm/pmap/pmap.c's commpage-nesting static_assert
+ * for ARM_PGSHIFT==12 requires _COMM_PAGE64_BASE_ADDRESS to sit above
+ * MACH_VM_MAX_ADDRESS, which only holds if this stays the smaller
+ * iOS-style ceiling - the 16K branch's macOS-sized ceiling is exempt
+ * from that assert only because 16K macOS nests the commpage inside
+ * userspace as a VM-reserved region instead (see that assert's comment).
+ */
+#define MACH_VM_MAX_ADDRESS_RAW 0x0000000FC0000000ULL
+#endif
 #else
 #define MACH_VM_MAX_ADDRESS_RAW 0x0000000FC0000000ULL
 #endif
