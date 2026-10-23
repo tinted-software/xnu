@@ -692,7 +692,16 @@ def build_kernelcache(
     kernel = Macho.parse(kdata)
     if kernel.filetype != MH_EXECUTE:
         raise ValueError(f"kernel is not MH_EXECUTE: 0x{kernel.filetype:x}")
-    ksyms = {n: v for n, t, v in kernel.symbols() if t & N_EXT and t & N_TYPE == N_SECT}
+    # Prelinked kexts bind against the kernel's whole symbol table, exported or
+    # not (in a kernel collection they share the kernel's image); prefer a
+    # global definition over a local one of the same name.
+    ksyms = {}
+    for n, t, v in kernel.symbols():
+        if t & N_TYPE == N_SECT and not t & N_EXT:
+            ksyms.setdefault(n, v)
+    for n, t, v in kernel.symbols():
+        if t & N_TYPE == N_SECT and t & N_EXT:
+            ksyms[n] = v
     kexts = [load_kext(bid, path, layout) for bid, path in kext_args]
 
     base = layout.base

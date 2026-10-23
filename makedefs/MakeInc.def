@@ -489,12 +489,12 @@ endif
 #   0x400000 kernel __DATA_CONST
 #   0x500000 kernel __LASTDATA_CONST
 #   0x500000 kext __DATA_CONST      (1M)
-#   0x600000 kext __TEXT_EXEC       (2M)
-#   0x800000 kernel __TEXT_EXEC
+#   0x704000 kext __TEXT_EXEC       (4M)
+#   0xc00000 kernel __TEXT_EXEC
 #  0x1600000 kernel __TEXT_BOOT_EXEC / __KLD / __LAST
 #  0x1800000 kernel __KLDDATA, then __DATA, __BOOTDATA
-#  0x1d00000 kext __DATA            (1M)
-#  0x1e00000 __LINKEDIT
+#  0x1d00000 kext __DATA            (2M)
+#  0x1f00000 __LINKEDIT
 #
 KERNELCACHE ?= 0
 ifeq ($(KERNELCACHE),1)
@@ -506,14 +506,14 @@ ARM64_IMAGE_BASE        = $(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACH
 KERNELCACHE_SEGADDRS    = \
 	-Wl,-segaddr,__DATA_CONST,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x400000 ))') \
 	-Wl,-segaddr,__LASTDATA_CONST,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x500000 ))') \
-	-Wl,-segaddr,__TEXT_EXEC,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x800000 ))') \
+	-Wl,-segaddr,__TEXT_EXEC,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0xc00000 ))') \
 	-Wl,-segaddr,__TEXT_BOOT_EXEC,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1600000 ))') \
 	-Wl,-segaddr,__KLD,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1608000 ))') \
 	-Wl,-segaddr,__LAST,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x160c000 ))') \
 	-Wl,-segaddr,__KLDDATA,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1800000 ))') \
 	-Wl,-segaddr,__DATA,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1810000 ))') \
 	-Wl,-segaddr,__BOOTDATA,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1b10000 ))') \
-	-Wl,-segaddr,__LINKEDIT,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1e00000 ))')
+	-Wl,-segaddr,__LINKEDIT,$(shell $(BASH) -c 'printf "0x%016x" $$(( $(KERNELCACHE_BASE) + 0x1f00000 ))')
 LDFLAGS_KERNEL_PRELINK_STANDALONE =
 LDFLAGS_KERNEL_PLK_SECTS =
 # Room for the six empty prelink/PLK segments the assembler appends.
@@ -999,6 +999,11 @@ LDFLAGS_KERNEL_GEN = \
 
 # LDFLAGS_KERNEL_SDK	= -L$(SDKROOT)/usr/local/lib/kernel -lfirehose_kernel
 LDFLAGS_KERNEL_SDK	= -L$(SDKROOT)/usr/local/lib/kernel -L$(SDKROOT)/usr/local/lib/kernel/platform
+# corecrypto built from apple/corecrypto, linked into the kernel so the early
+# startup code has a crypto provider before kexts can start.
+ifneq ($(CORECRYPTO_KERNEL_LIB),)
+LDFLAGS_KERNEL_SDK	+= -Wl,-force_load,$(CORECRYPTO_KERNEL_LIB)
+endif
 ifneq ($(KDKROOT),)
 LDFLAGS_KERNEL_SDK     += -L$(KDKROOT)/usr/local/lib/kernel/platform
 endif
