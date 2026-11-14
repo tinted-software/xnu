@@ -11,16 +11,16 @@ path = "src/lib.rs"
 [dependencies]
 annotate-snippets = "0.12"
 winnow = "1.0"
-winnow-args = "0.3.0"
-object = { version = "0.40.0", default-features = false, features = ["read_core", "macho"] }
+winnow-args = "0.6.2"
+object = { version = "0.41.0", default-features = false, features = ["read_core", "macho"] }
 
 # xnurc dependencies
 sha1 = { version = "=0.11.0", default-features = false }
 sha2 = { version = "=0.11.1", default-features = false, features = ["zeroize"] }
 md-5 = { version = "=0.11.0", default-features = false }
-aes = { version = "0.9.2", default-features = false, features = ["zeroize"] }
+aes = { version = "=0.9.2", default-features = false, features = ["zeroize"] }
 des = { version = "0.9.0", default-features = false, features = ["zeroize"] }
-crypto-bigint = { version = "0.7.5", default-features = false }
+crypto-bigint = { version = "0.7.11", default-features = false }
 chacha20 = { version = "0.10.2", default-features = false, features = ["cipher", "zeroize"] }
 poly1305 = { version = "0.9.1", default-features = false, features = ["zeroize"] }
 ghash = { version = "0.6.0", default-features = false, features = ["zeroize"] }
@@ -32,3 +32,13 @@ hadris-io = { git = "https://github.com/tinted-software/hadris", default-feature
 hadris-apfs = { git = "https://github.com/tinted-software/hadris", default-features = false, features = ["encryption", "sync", "write"], branch = "theoparis/apfs-write" }
 hadris-fs = { git = "https://github.com/tinted-software/hadris", default-features = false, features = ["sync"], branch = "theoparis/apfs-write" }
 hadris-storage = { git = "https://github.com/tinted-software/hadris", default-features = false, features = ["sync"], branch = "theoparis/apfs-write" }
+
+[features]
+default = ["userspace"]
+userspace = ["dep:brush", "dep:gpui", "dep:gpui_platform", "dep:gpui_android"]
+
+[target.'cfg(not(target_os = "none"))'.dependencies]
+brush = { git = "https://github.com/reubeno/brush", artifact = ["bin"], optional = true }
+gpui = { git = "https://github.com/tinted-software/zed", optional = true }
+gpui_platform = { git = "https://github.com/tinted-software/zed", features = ["font-kit"], optional = true }
+gpui_android = { git = "https://github.com/tinted-software/zed", optional = true }
